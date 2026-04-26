@@ -1,0 +1,14 @@
+# Xii_Raw Graph 配置文件
+# 请将此文件重命名为 .env 并填入你的 OpenAI API Key
+
+# OpenAI API 密钥 (必需)
+# 从 https://platform.openai.com/api-keys 获取
+OPENAI_API_KEY=your-openai-api-key-here
+
+# 示例:
+# OPENAI_API_KEY=sk-proj-1234567890abcdef...
+
+# 注意:
+# 1. 不要将包含真实密钥的文件分享给他人
+# 2. 定期检查 API 使用情况和费用
+# 3. 如果密钥泄露，立即在 OpenAI 后台重新生成

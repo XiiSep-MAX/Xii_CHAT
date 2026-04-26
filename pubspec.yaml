@@ -1,0 +1,37 @@
+name: ai_chat_app
+description: A simple Flutter AI chat app powered by OpenAI.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.1.0
+  cached_network_image: ^3.2.3
+  path_provider: ^2.1.0
+  path: ^1.8.0
+  msix: ^3.16.13
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+  integration_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+
+msix:
+  display_name: Xii_Raw Graph
+  publisher_display_name: Xii_Raw
+  identity_name: XiiRaw.AIChatApp
+  publisher: CN=Xii_Raw
+  logo_path: windows/runner/resources/app_icon.ico
+  capabilities: internetClient
+  languages: zh-CN,en-us
+  sign_msix: false

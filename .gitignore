@@ -1,0 +1,40 @@
+# Flutter/Dart/Pub related
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# IDE related
+.idea/
+.vscode/
+
+# Sensitive files (DO NOT COMMIT!)
+.env
+.env.local
+.env.production
+.env.staging
+*.key
+*.pem
+*.pfx
+cert.pfx
+
+# API Keys and secrets
+api_keys.json
+secrets.json
+config/secrets.dart
+
+# Windows build artifacts
+*.exe
+*.msix
+build/windows/
+
+# Release packages
+release/
+*.zip
+
+# Misc
+.DS_Store
+**/GeneratedPluginRegistrant.java
