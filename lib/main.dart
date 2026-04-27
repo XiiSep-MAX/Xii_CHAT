@@ -116,12 +116,12 @@ class _ChatScreenState extends State<ChatScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               TextButton(
-                onPressed: () {
+                onPressed: () async {
                   // 打开下载链接
-                  _openDownloadUrl(versionInfo.downloadUrl);
                   Navigator.pop(context);
+                  await _openDownloadUrl(versionInfo.downloadUrl);
                 },
-                child: const Text('手动下载'),
+                child: const Text('打开链接'),
               ),
               const SizedBox(width: 8),
               ElevatedButton(
@@ -129,7 +129,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   Navigator.pop(context);
                   await _downloadAndInstallUpdate(versionInfo);
                 },
-                child: const Text('自动下载'),
+                child: const Text('安装更新'),
               ),
             ],
           ),
@@ -139,37 +139,38 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _downloadAndInstallUpdate(VersionInfo versionInfo) async {
+    final navigator = Navigator.of(context, rootNavigator: true);
+
     // 显示下载进度
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => const AlertDialog(
-        title: Text('下载更新中...'),
+        title: Text('准备更新中...'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             CircularProgressIndicator(),
             SizedBox(height: 16),
-            Text('正在下载新版本，请稍候...'),
+            Text('正在启动 Windows 安装程序，请稍候...'),
           ],
         ),
       ),
     );
 
     try {
-      final success = await UpdateService.downloadAndInstallUpdate(versionInfo);
-      Navigator.pop(context); // 关闭下载对话框
+      final result = await UpdateService.downloadAndInstallUpdate(versionInfo);
+      if (navigator.mounted && navigator.canPop()) {
+        navigator.pop();
+      }
+      if (!mounted) return;
 
-      if (success) {
-        // 显示安装说明
+      if (result.success) {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('✅ 下载完成'),
-            content: const Text(
-              '更新文件已下载到下载文件夹。\n\n'
-              '请按照控制台中的说明完成安装。'
-            ),
+            title: const Text('🚀 安装程序已启动'),
+            content: Text(result.message),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
@@ -179,10 +180,13 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         );
       } else {
-        _showErrorDialog('下载失败，请手动下载更新。');
+        _showErrorDialog(result.message);
       }
     } catch (e) {
-      Navigator.pop(context); // 关闭下载对话框
+      if (navigator.mounted && navigator.canPop()) {
+        navigator.pop();
+      }
+      if (!mounted) return;
       _showErrorDialog('下载过程中出现错误: $e');
     }
   }
@@ -203,9 +207,10 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _openDownloadUrl(String url) {
-    // 在实际应用中，可以使用 url_launcher 包来打开链接
-    print('打开下载链接: $url');
+  Future<void> _openDownloadUrl(String url) async {
+    final opened = await UpdateService.openDownloadUrl(url);
+    if (!mounted || opened) return;
+    _showErrorDialog('无法打开更新链接，请手动访问：\n$url');
   }
 
   @override
@@ -245,7 +250,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
 
     try {
-      final response = await _chatService.sendMessage(text);
+      final response = await _chatService.sendMessage(prompt: text);
       setState(() {
         _messages.add(ChatMessage(
           text: response.text,
@@ -326,15 +331,22 @@ class _ChatScreenState extends State<ChatScreen> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
-                      Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.3),
+                      Theme.of(context)
+                          .colorScheme
+                          .primaryContainer
+                          .withOpacity(0.3),
+                      Theme.of(context)
+                          .colorScheme
+                          .secondaryContainer
+                          .withOpacity(0.3),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+                    color:
+                        Theme.of(context).colorScheme.outline.withOpacity(0.1),
                     width: 1,
                   ),
                 ),
@@ -370,12 +382,17 @@ class _ChatScreenState extends State<ChatScreen> {
             if (_isSending)
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primaryContainer
+                      .withOpacity(0.3),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                    color:
+                        Theme.of(context).colorScheme.primary.withOpacity(0.2),
                     width: 1,
                   ),
                 ),
@@ -436,10 +453,16 @@ class _ChatScreenState extends State<ChatScreen> {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceVariant
+                            .withOpacity(0.3),
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .outline
+                              .withOpacity(0.2),
                           width: 1,
                         ),
                       ),
@@ -452,14 +475,18 @@ class _ChatScreenState extends State<ChatScreen> {
                         decoration: InputDecoration(
                           hintText: '输入您的问题...',
                           hintStyle: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.6),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant
+                                .withOpacity(0.6),
                           ),
                           prefixIcon: Icon(
                             Icons.chat_bubble_outline_rounded,
                             color: Theme.of(context).colorScheme.primary,
                           ),
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
                         ),
                       ),
                     ),
@@ -478,7 +505,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: (_isSending ? Colors.grey : Colors.blue).withOpacity(0.3),
+                          color: (_isSending ? Colors.grey : Colors.blue)
+                              .withOpacity(0.3),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -501,7 +529,8 @@ class _ChatScreenState extends State<ChatScreen> {
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
                             )
                           : const Icon(
@@ -604,7 +633,8 @@ class ChatBubble extends StatelessWidget {
     final textColor = isUser
         ? Theme.of(context).colorScheme.onPrimaryContainer
         : Theme.of(context).colorScheme.onSurfaceVariant;
-    final alignment = isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+    final alignment =
+        isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start;
 
     final avatar = Container(
       width: 40,
@@ -651,8 +681,12 @@ class ChatBubble extends StatelessWidget {
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(18),
                         topRight: const Radius.circular(18),
-                        bottomLeft: isUser ? const Radius.circular(18) : const Radius.circular(4),
-                        bottomRight: isUser ? const Radius.circular(4) : const Radius.circular(18),
+                        bottomLeft: isUser
+                            ? const Radius.circular(18)
+                            : const Radius.circular(4),
+                        bottomRight: isUser
+                            ? const Radius.circular(4)
+                            : const Radius.circular(18),
                       ),
                       boxShadow: [
                         BoxShadow(
@@ -662,7 +696,8 @@ class ChatBubble extends StatelessWidget {
                         ),
                       ],
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     child: Text(
                       message.text,
                       style: TextStyle(
@@ -708,7 +743,8 @@ class ChatBubble extends StatelessWidget {
                               height: 32,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.grey),
                               ),
                             ),
                           ),
@@ -747,9 +783,8 @@ class ChatBubble extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Align(
-                    alignment: isUser
-                        ? Alignment.centerRight
-                        : Alignment.centerLeft,
+                    alignment:
+                        isUser ? Alignment.centerRight : Alignment.centerLeft,
                     child: Container(
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.surface,
@@ -777,7 +812,8 @@ class ChatBubble extends StatelessWidget {
                           ),
                         ),
                         style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),

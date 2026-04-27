@@ -50,7 +50,7 @@ flutter pub run msix:create --certificate-path cert.pfx
 | 方式 | 文件大小 | 发布难度 | 用户体验 | 自动更新 |
 |------|--------|--------|--------|---------|
 | **EXE 便携版** | ~50-100MB | 简单 | 双击运行 | ❌ 手动 |
-| **MSIX 安装** | ~30-50MB | 中等 | 类似软件商店 | ⚠️ 手动 |
+| **MSIX 安装** | ~30-50MB | 中等 | 类似软件商店 | ✅ 应用内拉起安装 |
 | **Microsoft Store** | 压缩分发 | 复杂 | 官方体验 | ✅ 自动 |
 | **GitHub Releases** | 全部包含 | 简单 | 下载解压 | ⚠️ 手动 |
 
@@ -67,7 +67,7 @@ flutter pub run msix:create --certificate-path cert.pfx
 ```json
 {
   "version": "1.0.1",
-  "downloadUrl": "https://your-server.com/ai_chat_app-1.0.1.exe",
+  "downloadUrl": "https://your-server.com/Xii_Raw_Graph-1.0.1.appinstaller",
   "releaseNotes": "- 修复 bug\n- 性能优化",
   "isForced": false
 }
@@ -90,7 +90,7 @@ static const String _versionCheckUrl =
 
 - 应用启动时自动检查版本
 - 发现新版本时弹出更新提示
-- 用户可选择立即更新或稍后提醒
+- 用户可选择直接启动 Windows App Installer 完成升级
 - `isForced: true` 时强制更新
 
 ---
@@ -110,7 +110,7 @@ static const String _versionCheckUrl =
 ```
 ✅ 启用版本检查和更新提示
 ✅ 托管 version.json 到 GitHub
-✅ 用户可手动下载新版本
+✅ 应用内启动 MSIX / App Installer 更新
 ```
 
 #### 第 3 阶段：规模扩展

@@ -69,6 +69,7 @@ flutter pub run msix:create --certificate-path cert.pfx --certificate-password 1
 
 最终发布给用户的包应包含：
 - `Xii_Raw_Graph_*.msix`
+- `Xii_Raw_Graph_*.appinstaller`（推荐，用于应用内更新）
 - `USER_SETUP_GUIDE.md`
 - `.env.example`
 - `version.json`（可选，用于后续自动更新）
@@ -81,7 +82,10 @@ flutter pub run msix:create --certificate-path cert.pfx --certificate-password 1
 
 1. 双击 `Xii_Raw_Graph_v1.1.0.msix`
 2. 如果系统提示证书不受信任，请在 Windows 开发者模式下继续安装
-3. 安装完成后，进入应用目录创建 `.env`
+3. 推荐通过环境变量配置 API Key，或在以下目录创建 `.env`
+   ```text
+   %LOCALAPPDATA%\Xii_Raw Graph\.env
+   ```
    ```text
    OPENAI_API_KEY=sk-your-actual-key-here
    ```
@@ -111,11 +115,13 @@ static const String _versionCheckUrl =
 ```json
 {
   "version": "1.1.0",
-  "downloadUrl": "https://example.com/Xii_Raw_Graph_v1.1.0.zip",
+  "downloadUrl": "https://example.com/Xii_Raw_Graph_v1.1.0.appinstaller",
   "releaseNotes": "- 修复问题\n- 优化体验",
   "isForced": false
 }
 ```
+
+推荐优先发布 `.appinstaller` 文件，并让它引用对应版本的 `.msix` 包。这样应用内点击“安装更新”时可以直接拉起 Windows App Installer 完成覆盖升级。
 
 ### 5.3 发布渠道
 
