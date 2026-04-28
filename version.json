@@ -1,6 +1,6 @@
 {
   "version": "1.1.0",
-  "downloadUrl": "https://gitee.com/Xii_ALL/xii_-raw_-graph/raw/main/downloads/Xii_Raw_Graph_Portable_v1.1.0.zip",
-  "releaseNotes": "✨ 新版本特性\n\n新增功能:\n- 发布方式切换为免安装 ZIP 便携版\n- 提供 Gitee Pages 下载页\n- 支持图片上传与下载反馈\n\n修复:\n- 修复图片下载无提示问题\n- 提升更新下载体验",
+  "downloadUrl": "https://raw.githubusercontent.com/XiiSep-MAX/Xii_CHAT/main/downloads/Xii_Raw_Graph_Portable_v1.1.0.zip",
+  "releaseNotes": "✨ 新版本特性\n\n新增功能:\n- 发布方式切换为免安装 ZIP 便携版\n- 提供 GitHub Pages 下载页\n- 解压后可直接看到 EXE 主程序\n- 支持图片上传与下载反馈\n\n修复:\n- 修复图片下载无提示问题\n- 提升更新下载体验",
   "isForced": false
 }

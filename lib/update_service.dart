@@ -9,7 +9,7 @@ import 'package:path_provider/path_provider.dart';
 class UpdateService {
   // 版本检查元数据地址
   static const String _versionCheckUrl =
-      'https://gitee.com/Xii_ALL/xii_-raw_-graph/raw/main/version.json';
+      'https://raw.githubusercontent.com/XiiSep-MAX/Xii_CHAT/main/version.json';
 
   /// 获取远程版本信息
   static Future<VersionInfo?> checkForUpdates({

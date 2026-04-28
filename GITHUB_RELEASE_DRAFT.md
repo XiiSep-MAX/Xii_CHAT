@@ -20,8 +20,8 @@ Xii_Raw Graph v1.1.0
 - ✅ 提升应用稳定性与异常处理
 
 ### 运行说明
-1. 解压 `Xii_Raw_Graph_v1.1.0.zip`
-2. 在文件夹内创建 `.env`
+1. 解压 `Xii_Raw_Graph_Portable_v1.1.0.zip`
+2. 在解压后的目录内创建 `.env`
 3. 添加 OpenAI API Key：
    ```text
    OPENAI_API_KEY=sk-your-actual-key-here
@@ -34,7 +34,7 @@ Xii_Raw Graph v1.1.0
 - 如果需要测试自动更新，请部署 `version.json` 到可访问的 URL，并修改 `lib/update_service.dart` 中的 `_versionCheckUrl`
 
 ### 发布资产
-- `Xii_Raw_Graph_v1.1.0.zip`
+- `Xii_Raw_Graph_Portable_v1.1.0.zip`
 - `USER_SETUP_GUIDE.md`（安装与配置说明）
 - `.env.example`
 
@@ -46,11 +46,11 @@ Xii_Raw Graph v1.1.0
 ---
 
 ## 线上更新配置建议
-如果希望启用自动更新检查，请将 `version.json` 上传至你的服务器或 GitHub Raw URL，然后在 `lib/update_service.dart` 中替换：
+如果希望启用自动更新检查，请将 `version.json` 上传至可访问地址，推荐直接使用当前 GitHub 仓库 Raw 链接：
 
 ```dart
 static const String _versionCheckUrl =
-    'https://raw.githubusercontent.com/your-repo/version.json';
+    'https://raw.githubusercontent.com/XiiSep-MAX/Xii_CHAT/main/version.json';
 ```
 
 并将 `downloadUrl` 指向下载包地址。

@@ -9,7 +9,7 @@
 当前默认发布包是 `免安装 EXE 压缩包（ZIP）`。
 
 - 请先完整解压 ZIP
-- 再进入 `Xii_Raw_Graph_Portable` 文件夹运行 `ai_chat_app.exe`
+- 解压完成后，直接在当前目录运行 `ai_chat_app.exe`
 - 不建议直接在压缩包预览窗口里双击运行
 
 ## 📋 配置步骤
@@ -51,7 +51,7 @@ OPENAI_API_KEY=sk-your-actual-api-key-here
 
 #### 方法三：便携版目录下创建 `.env`
 
-如果你运行的是便携版，可以直接把程序目录里的 `.env.example` 复制并重命名为 `.env`，再填入真实 Key。
+如果你运行的是便携版，可以直接在程序目录里把 `.env.example` 复制并重命名为 `.env`，再填入真实 Key。
 
 ### 3. 验证配置
 

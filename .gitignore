@@ -42,3 +42,4 @@ release/
 # Misc
 .DS_Store
 **/GeneratedPluginRegistrant.java
+_publish_tmp/

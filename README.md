@@ -23,7 +23,7 @@
 
 1. **克隆项目**
    ```bash
-   git clone https://gitee.com/Xii_ALL/xii_-raw_-graph.git
+   git clone https://github.com/XiiSep-MAX/Xii_CHAT.git
    cd xii_-raw_-graph
    ```
 
@@ -142,7 +142,7 @@ test/
 
 ## 📞 联系方式
 
-如有问题，请通过 Gitee Issues 联系。
+如有问题，请通过 GitHub Issues 联系。
 
 ---
 

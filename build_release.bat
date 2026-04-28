@@ -5,7 +5,6 @@ cd /d "%~dp0"
 
 set "POWERSHELL_EXE=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
 set "OUTPUT_ROOT=release\READY_TO_SEND\Portable_ZIP"
-set "APP_FOLDER=%OUTPUT_ROOT%\Xii_Raw_Graph_Portable"
 set "APP_VERSION=1.1.0"
 set "DOWNLOADS_DIR=downloads"
 
@@ -32,10 +31,10 @@ if exist "build\windows\x64\runner\Release\.env" (
 )
 
 if exist "%OUTPUT_ROOT%" rmdir /s /q "%OUTPUT_ROOT%"
-mkdir "%APP_FOLDER%"
+mkdir "%OUTPUT_ROOT%"
 
 echo 2. Copying portable runtime files...
-xcopy /e /i /y "build\windows\x64\runner\Release\*" "%APP_FOLDER%\" >nul
+xcopy /e /i /y "build\windows\x64\runner\Release\*" "%OUTPUT_ROOT%\" >nul
 if errorlevel 1 (
   echo [ERROR] Failed to copy the Windows release files.
   exit /b 1
@@ -45,9 +44,9 @@ copy /y "USER_SETUP_GUIDE.md" "%OUTPUT_ROOT%\" >nul
 copy /y "PORTABLE_PACKAGE_README.md" "%OUTPUT_ROOT%\" >nul
 copy /y "CONTACT_AUTHOR_WX.txt" "%OUTPUT_ROOT%\" >nul
 
-if exist "%APP_FOLDER%\.env" del /f /q "%APP_FOLDER%\.env"
+if exist "%OUTPUT_ROOT%\.env" del /f /q "%OUTPUT_ROOT%\.env"
 if exist ".env.example" (
-  copy /y ".env.example" "%APP_FOLDER%\.env.example" >nul
+  copy /y ".env.example" "%OUTPUT_ROOT%\.env.example" >nul
 )
 
 echo 3. Creating ZIP archive...
@@ -66,11 +65,11 @@ if errorlevel 1 (
 
 echo.
 echo Portable ZIP package created successfully:
-echo   Folder: %OUTPUT_ROOT%
+echo   Staging: %OUTPUT_ROOT%
 echo   Zip:    %ZIP_OUTPUT%
 echo   Repo:   %DOWNLOADS_DIR%\Xii_Raw_Graph_Portable_v%APP_VERSION%.zip
 echo.
 echo Recommended next step:
-echo   Commit and push the updated ZIP, index.html, and version.json to Gitee.
+echo   Commit and push the updated ZIP, index.html, and version.json to GitHub.
 
 endlocal
