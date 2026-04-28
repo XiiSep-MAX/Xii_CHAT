@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'chat_service.dart';
@@ -142,35 +143,44 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _downloadAndInstallUpdate(VersionInfo versionInfo) async {
     final navigator = Navigator.of(context, rootNavigator: true);
+    final progressNotifier = ValueNotifier<UpdateDownloadProgress>(
+      const UpdateDownloadProgress(
+        phase: UpdateDownloadPhase.connecting,
+        message: '正在准备下载更新包...',
+        downloadedBytes: 0,
+        totalBytes: null,
+        attempt: 1,
+        maxAttempts: 3,
+      ),
+    );
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        title: Text('准备更新中...'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('正在获取最新更新包，请稍候...'),
-          ],
-        ),
+      builder: (context) => _UpdateDownloadDialog(
+        progressListenable: progressNotifier,
       ),
     );
 
     try {
-      final result = await UpdateService.downloadAndInstallUpdate(versionInfo);
+      final result = await UpdateService.downloadAndInstallUpdate(
+        versionInfo,
+        onProgress: (progress) {
+          progressNotifier.value = progress;
+        },
+      );
       if (navigator.mounted && navigator.canPop()) {
         navigator.pop();
       }
       if (!mounted) return;
 
       if (result.success) {
+        final successTitle =
+            result.message.contains('浏览器') ? '🌐 已切换浏览器下载' : '🚀 更新已准备好';
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('🚀 更新已准备好'),
+            title: Text(successTitle),
             content: Text(result.message),
             actions: [
               TextButton(
@@ -189,6 +199,8 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       if (!mounted) return;
       _showErrorDialog('下载过程中出现错误: $e');
+    } finally {
+      progressNotifier.dispose();
     }
   }
 
@@ -765,6 +777,66 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _UpdateDownloadDialog extends StatelessWidget {
+  final ValueListenable<UpdateDownloadProgress> progressListenable;
+
+  const _UpdateDownloadDialog({
+    required this.progressListenable,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<UpdateDownloadProgress>(
+      valueListenable: progressListenable,
+      builder: (context, progress, child) {
+        final indicatorValue = progress.progress;
+        final title = switch (progress.phase) {
+          UpdateDownloadPhase.connecting => '连接下载服务器',
+          UpdateDownloadPhase.downloading => '正在下载更新',
+          UpdateDownloadPhase.retrying => '正在重试下载',
+          UpdateDownloadPhase.finalizing => '整理下载结果',
+          UpdateDownloadPhase.fallback => '切换浏览器下载',
+        };
+
+        return AlertDialog(
+          title: Text(title),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              LinearProgressIndicator(value: indicatorValue),
+              const SizedBox(height: 16),
+              Text(
+                progress.message,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                progress.progressLabel,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '尝试次数：${progress.attempt}/${progress.maxAttempts}',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

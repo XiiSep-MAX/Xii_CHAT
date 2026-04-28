@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -10,6 +11,10 @@ class UpdateService {
   // 版本检查元数据地址
   static const String _versionCheckUrl =
       'https://raw.githubusercontent.com/XiiSep-MAX/Xii_CHAT/main/version.json';
+  static const Duration _packageConnectTimeout = Duration(seconds: 20);
+  static const Duration _packageReadTimeout = Duration(seconds: 20);
+  static const Duration _packageAttemptTimeout = Duration(minutes: 8);
+  static const int _maxDownloadAttempts = 3;
 
   /// 获取远程版本信息
   static Future<VersionInfo?> checkForUpdates({
@@ -32,8 +37,9 @@ class UpdateService {
 
   /// 下载并提示安装便携版更新
   static Future<UpdateInstallResult> downloadAndInstallUpdate(
-    VersionInfo versionInfo,
-  ) async {
+    VersionInfo versionInfo, {
+    void Function(UpdateDownloadProgress progress)? onProgress,
+  }) async {
     try {
       if (!Platform.isWindows) {
         return const UpdateInstallResult.failure('便携版更新仅支持 Windows 桌面版。');
@@ -53,20 +59,44 @@ class UpdateService {
 
       if (packageType == _UpdatePackageType.zipPackage ||
           packageType == _UpdatePackageType.executable) {
-        final localPackage = await _downloadPortablePackage(
-          uri: uri,
-          version: versionInfo.version,
-          packageType: packageType,
-        );
-        final opened = await _openFolderAndSelectFile(localPackage.path);
-        final suffix = opened ? '，并已为你打开所在目录。' : '。';
-        final actionHint = packageType == _UpdatePackageType.zipPackage
-            ? '请先解压 ZIP，再用新文件替换旧版本。'
-            : '请关闭旧版本后运行新文件。';
+        try {
+          final localPackage = await _downloadPortablePackage(
+            uri: uri,
+            version: versionInfo.version,
+            packageType: packageType,
+            onProgress: onProgress,
+          );
+          final opened = await _openFolderAndSelectFile(localPackage.path);
+          final suffix = opened ? '，并已为你打开所在目录。' : '。';
+          final actionHint = packageType == _UpdatePackageType.zipPackage
+              ? '请先解压 ZIP，再用新文件替换旧版本。'
+              : '请关闭旧版本后运行新文件。';
 
-        return UpdateInstallResult.success(
-          '便携版更新包已下载到：${localPackage.path}$suffix\n\n$actionHint',
-        );
+          return UpdateInstallResult.success(
+            '便携版更新包已下载到：${localPackage.path}$suffix\n\n$actionHint',
+          );
+        } on TimeoutException catch (error) {
+          stderr.writeln('自动下载超时: $error');
+          return _fallbackToBrowserDownload(
+            downloadUrl: downloadUrl,
+            onProgress: onProgress,
+            reason: '自动下载超时',
+          );
+        } on SocketException catch (error) {
+          stderr.writeln('自动下载网络异常: $error');
+          return _fallbackToBrowserDownload(
+            downloadUrl: downloadUrl,
+            onProgress: onProgress,
+            reason: '网络连接不稳定',
+          );
+        } on HttpException catch (error) {
+          stderr.writeln('自动下载 HTTP 异常: $error');
+          return _fallbackToBrowserDownload(
+            downloadUrl: downloadUrl,
+            onProgress: onProgress,
+            reason: '下载源暂时不可用',
+          );
+        }
       }
 
       final opened = await openDownloadUrl(downloadUrl);
@@ -83,6 +113,32 @@ class UpdateService {
       stderr.writeln('更新启动失败: $e');
       return UpdateInstallResult.failure('启动更新失败: $e');
     }
+  }
+
+  static Future<UpdateInstallResult> _fallbackToBrowserDownload({
+    required String downloadUrl,
+    required String reason,
+    void Function(UpdateDownloadProgress progress)? onProgress,
+  }) async {
+    onProgress?.call(
+      UpdateDownloadProgress(
+        phase: UpdateDownloadPhase.fallback,
+        message: '$reason，正在为你打开浏览器下载链接...',
+        downloadedBytes: 0,
+        totalBytes: null,
+        attempt: _maxDownloadAttempts,
+        maxAttempts: _maxDownloadAttempts,
+      ),
+    );
+
+    final opened = await openDownloadUrl(downloadUrl);
+    if (opened) {
+      return UpdateInstallResult.success(
+        '$reason，已为你打开浏览器下载链接，请直接在浏览器中完成下载。',
+      );
+    }
+
+    return UpdateInstallResult.failure('$reason，请手动访问更新链接：$downloadUrl');
   }
 
   static Future<bool> openDownloadUrl(String url) async {
@@ -155,14 +211,9 @@ class UpdateService {
     required Uri uri,
     required String version,
     required _UpdatePackageType packageType,
+    void Function(UpdateDownloadProgress progress)? onProgress,
   }) async {
     stderr.writeln('开始下载便携版更新包: $uri');
-    final response = await http.get(uri).timeout(const Duration(seconds: 60));
-
-    if (response.statusCode != 200) {
-      throw Exception('下载失败: HTTP ${response.statusCode}');
-    }
-
     final downloadDir = await _resolveDownloadsDirectory();
     if (downloadDir == null) {
       throw Exception('无法定位下载目录');
@@ -176,9 +227,163 @@ class UpdateService {
       defaultExtension: defaultExtension,
     );
     final file = await _resolveAvailableFile(downloadDir, filename);
-    await file.writeAsBytes(response.bodyBytes, flush: true);
-    stderr.writeln('便携版更新包下载完成: ${file.path}');
-    return file;
+    final tempFile = File('${file.path}.part');
+
+    await _deleteIfExists(tempFile);
+
+    final client = http.Client();
+    Object? lastError;
+    StackTrace? lastStackTrace;
+
+    try {
+      for (var attempt = 1; attempt <= _maxDownloadAttempts; attempt++) {
+        try {
+          if (attempt > 1) {
+            onProgress?.call(
+              UpdateDownloadProgress(
+                phase: UpdateDownloadPhase.retrying,
+                message: '下载中断，正在进行第 $attempt/$_maxDownloadAttempts 次重试...',
+                downloadedBytes: 0,
+                totalBytes: null,
+                attempt: attempt,
+                maxAttempts: _maxDownloadAttempts,
+              ),
+            );
+          }
+
+          final downloadedFile = await _downloadPortablePackageAttempt(
+            client: client,
+            uri: uri,
+            targetFile: file,
+            tempFile: tempFile,
+            attempt: attempt,
+            onProgress: onProgress,
+          ).timeout(_packageAttemptTimeout);
+
+          stderr.writeln('便携版更新包下载完成: ${downloadedFile.path}');
+          return downloadedFile;
+        } catch (error, stackTrace) {
+          lastError = error;
+          lastStackTrace = stackTrace;
+          await _deleteIfExists(tempFile);
+
+          if (!_shouldRetry(error) || attempt >= _maxDownloadAttempts) {
+            break;
+          }
+        }
+      }
+    } finally {
+      client.close();
+    }
+
+    Error.throwWithStackTrace(
+      lastError ?? Exception('下载失败：未知错误'),
+      lastStackTrace ?? StackTrace.current,
+    );
+  }
+
+  static Future<File> _downloadPortablePackageAttempt({
+    required http.Client client,
+    required Uri uri,
+    required File targetFile,
+    required File tempFile,
+    required int attempt,
+    void Function(UpdateDownloadProgress progress)? onProgress,
+  }) async {
+    onProgress?.call(
+      UpdateDownloadProgress(
+        phase: UpdateDownloadPhase.connecting,
+        message: '正在连接下载服务器...',
+        downloadedBytes: 0,
+        totalBytes: null,
+        attempt: attempt,
+        maxAttempts: _maxDownloadAttempts,
+      ),
+    );
+
+    final request = http.Request('GET', uri);
+    final response = await client.send(request).timeout(_packageConnectTimeout);
+
+    if (response.statusCode != 200) {
+      throw HttpException('下载失败: HTTP ${response.statusCode}');
+    }
+
+    final totalBytes =
+        response.contentLength != null && response.contentLength! > 0
+            ? response.contentLength
+            : null;
+
+    IOSink? sink;
+    var downloadedBytes = 0;
+
+    try {
+      sink = tempFile.openWrite();
+      onProgress?.call(
+        UpdateDownloadProgress(
+          phase: UpdateDownloadPhase.downloading,
+          message: '正在下载更新包...',
+          downloadedBytes: downloadedBytes,
+          totalBytes: totalBytes,
+          attempt: attempt,
+          maxAttempts: _maxDownloadAttempts,
+        ),
+      );
+
+      await for (final chunk in response.stream.timeout(_packageReadTimeout)) {
+        downloadedBytes += chunk.length;
+        sink.add(chunk);
+        onProgress?.call(
+          UpdateDownloadProgress(
+            phase: UpdateDownloadPhase.downloading,
+            message: '正在下载更新包...',
+            downloadedBytes: downloadedBytes,
+            totalBytes: totalBytes,
+            attempt: attempt,
+            maxAttempts: _maxDownloadAttempts,
+          ),
+        );
+      }
+
+      await sink.flush();
+      await sink.close();
+      sink = null;
+
+      if (downloadedBytes <= 0) {
+        throw const HttpException('下载结果为空，请稍后重试。');
+      }
+
+      onProgress?.call(
+        UpdateDownloadProgress(
+          phase: UpdateDownloadPhase.finalizing,
+          message: '下载完成，正在整理更新包...',
+          downloadedBytes: downloadedBytes,
+          totalBytes: totalBytes ?? downloadedBytes,
+          attempt: attempt,
+          maxAttempts: _maxDownloadAttempts,
+        ),
+      );
+
+      if (await targetFile.exists()) {
+        await targetFile.delete();
+      }
+      await tempFile.rename(targetFile.path);
+      return targetFile;
+    } catch (_) {
+      await sink?.close();
+      rethrow;
+    }
+  }
+
+  static bool _shouldRetry(Object error) {
+    return error is TimeoutException ||
+        error is SocketException ||
+        error is HttpException;
+  }
+
+  static Future<void> _deleteIfExists(File file) async {
+    if (await file.exists()) {
+      await file.delete();
+    }
   }
 
   static String _resolvePackageFilename(
@@ -249,6 +454,58 @@ enum _UpdatePackageType {
   zipPackage,
   executable,
   genericUrl,
+}
+
+enum UpdateDownloadPhase {
+  connecting,
+  downloading,
+  retrying,
+  finalizing,
+  fallback,
+}
+
+class UpdateDownloadProgress {
+  final UpdateDownloadPhase phase;
+  final String message;
+  final int downloadedBytes;
+  final int? totalBytes;
+  final int attempt;
+  final int maxAttempts;
+
+  const UpdateDownloadProgress({
+    required this.phase,
+    required this.message,
+    required this.downloadedBytes,
+    required this.totalBytes,
+    required this.attempt,
+    required this.maxAttempts,
+  });
+
+  bool get hasKnownTotal => totalBytes != null && totalBytes! > 0;
+
+  double? get progress {
+    if (!hasKnownTotal) return null;
+    return (downloadedBytes / totalBytes!).clamp(0.0, 1.0);
+  }
+
+  String get progressLabel {
+    if (!hasKnownTotal) return '已下载 ${_formatBytes(downloadedBytes)}';
+    final percent = ((progress ?? 0) * 100).toStringAsFixed(0);
+    return '$percent% · ${_formatBytes(downloadedBytes)} / ${_formatBytes(totalBytes!)}';
+  }
+
+  static String _formatBytes(int bytes) {
+    const units = ['B', 'KB', 'MB', 'GB'];
+    var value = bytes.toDouble();
+    var unitIndex = 0;
+    while (value >= 1024 && unitIndex < units.length - 1) {
+      value /= 1024;
+      unitIndex++;
+    }
+
+    final fractionDigits = value >= 100 || unitIndex == 0 ? 0 : 1;
+    return '${value.toStringAsFixed(fractionDigits)} ${units[unitIndex]}';
+  }
 }
 
 class UpdateInstallResult {
