@@ -68,19 +68,22 @@ class OpenAIChatService {
     required String prompt,
     ChatImageAttachment? imageAttachment,
   }) {
+    final trimmedPrompt = prompt.trim();
     if (imageAttachment == null) {
-      return prompt;
+      return trimmedPrompt;
     }
 
-    return [
-      {'type': 'text', 'text': prompt},
-      {
-        'type': 'image_url',
-        'image_url': {
-          'url': _buildDataUrl(imageAttachment),
-        },
+    final content = <Map<String, Object>>[];
+    if (trimmedPrompt.isNotEmpty) {
+      content.add({'type': 'text', 'text': trimmedPrompt});
+    }
+    content.add({
+      'type': 'image_url',
+      'image_url': {
+        'url': _buildDataUrl(imageAttachment),
       },
-    ];
+    });
+    return content;
   }
 
   String _buildDataUrl(ChatImageAttachment attachment) {

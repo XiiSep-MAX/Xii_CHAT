@@ -1,32 +1,76 @@
 @echo off
-echo 🚀 开始构建和打包AI聊天应用...
+setlocal enableextensions enabledelayedexpansion
 
 cd /d "%~dp0"
 
-echo 📦 构建MSIX安装包...
-flutter pub run msix:create
+set "POWERSHELL_EXE=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
+set "OUTPUT_ROOT=release\READY_TO_SEND\Portable_ZIP"
+set "APP_FOLDER=%OUTPUT_ROOT%\Xii_Raw_Graph_Portable"
+set "APP_VERSION=1.1.0"
+set "DOWNLOADS_DIR=downloads"
 
-if %errorlevel% neq 0 (
-    echo ❌ 构建失败
-    pause
-    exit /b 1
+for /f "tokens=2 delims=:, " %%i in ('findstr /i "\"version\"" version.json') do (
+  set "APP_VERSION=%%~i"
 )
 
-echo ✅ 构建成功！
+set "ZIP_OUTPUT=release\READY_TO_SEND\Xii_Raw_Graph_Portable_v%APP_VERSION%.zip"
 
-echo 📋 复制用户配置指南...
-if exist "build\windows\x64\runner\Release" (
-    copy "USER_SETUP_GUIDE.md" "build\windows\x64\runner\Release\"
-    echo 📄 配置指南已添加到发布包
+echo ==========================================
+echo Building portable ZIP package
+echo ==========================================
+
+echo 1. Building Windows release...
+call flutter build windows --release
+if errorlevel 1 (
+  echo [ERROR] Windows release build failed.
+  exit /b 1
 )
 
-echo 🎉 发布包准备完成！
+if exist "build\windows\x64\runner\Release\.env" (
+  echo [INFO] Removing stale .env from build output...
+  del /f /q "build\windows\x64\runner\Release\.env"
+)
+
+if exist "%OUTPUT_ROOT%" rmdir /s /q "%OUTPUT_ROOT%"
+mkdir "%APP_FOLDER%"
+
+echo 2. Copying portable runtime files...
+xcopy /e /i /y "build\windows\x64\runner\Release\*" "%APP_FOLDER%\" >nul
+if errorlevel 1 (
+  echo [ERROR] Failed to copy the Windows release files.
+  exit /b 1
+)
+
+copy /y "USER_SETUP_GUIDE.md" "%OUTPUT_ROOT%\" >nul
+copy /y "PORTABLE_PACKAGE_README.md" "%OUTPUT_ROOT%\" >nul
+copy /y "CONTACT_AUTHOR_WX.txt" "%OUTPUT_ROOT%\" >nul
+
+if exist "%APP_FOLDER%\.env" del /f /q "%APP_FOLDER%\.env"
+if exist ".env.example" (
+  copy /y ".env.example" "%APP_FOLDER%\.env.example" >nul
+)
+
+echo 3. Creating ZIP archive...
+"%POWERSHELL_EXE%" -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path '%~dp0%ZIP_OUTPUT%') { Remove-Item '%~dp0%ZIP_OUTPUT%' -Force }; Compress-Archive -Path '%~dp0%OUTPUT_ROOT%\*' -DestinationPath '%~dp0%ZIP_OUTPUT%'"
+if errorlevel 1 (
+  echo [ERROR] Failed to create the ZIP archive.
+  exit /b 1
+)
+
+if not exist "%DOWNLOADS_DIR%" mkdir "%DOWNLOADS_DIR%"
+copy /y "%ZIP_OUTPUT%" "%DOWNLOADS_DIR%\Xii_Raw_Graph_Portable_v%APP_VERSION%.zip" >nul
+if errorlevel 1 (
+  echo [ERROR] Failed to sync ZIP into repository downloads directory.
+  exit /b 1
+)
+
 echo.
-echo 📂 安装包位置: build\windows\x64\runner\Release\
-echo 📖 配置指南: USER_SETUP_GUIDE.md (已包含在发布包中)
+echo Portable ZIP package created successfully:
+echo   Folder: %OUTPUT_ROOT%
+echo   Zip:    %ZIP_OUTPUT%
+echo   Repo:   %DOWNLOADS_DIR%\Xii_Raw_Graph_Portable_v%APP_VERSION%.zip
 echo.
-echo 💡 重要提醒:
-echo   - 将安装包发送给用户前，请确保他们了解需要配置OpenAI API密钥
-echo   - 配置指南已包含在发布包中，用户可以直接查看
-echo.
-pause
+echo Recommended next step:
+echo   Commit and push the updated ZIP, index.html, and version.json to Gitee.
+
+endlocal

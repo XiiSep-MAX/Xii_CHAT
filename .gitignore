@@ -10,6 +10,7 @@ build/
 # IDE related
 .idea/
 .vscode/
+*.iml
 
 # Sensitive files (DO NOT COMMIT!)
 .env
@@ -30,10 +31,13 @@ config/secrets.dart
 *.exe
 *.msix
 build/windows/
+coverage/
 
 # Release packages
 release/
 *.zip
+!downloads/
+!downloads/*.zip
 
 # Misc
 .DS_Store

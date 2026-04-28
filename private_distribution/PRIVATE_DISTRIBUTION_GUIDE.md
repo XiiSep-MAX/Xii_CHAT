@@ -25,9 +25,9 @@
 
 3. **用户获取代码**
    ```bash
-   # 受邀用户克隆私有仓库
-   git clone https://github.com/your-username/your-private-repo.git
-   cd your-private-repo
+   # 使用 GitHub 提供的私有仓库 HTTPS 克隆地址
+   git clone <私有仓库克隆地址>
+   cd <私有仓库目录>
 
    # 配置环境变量
    cp .env.example .env
@@ -63,7 +63,7 @@
    cp SECURITY_GUIDE.md distribution/
 
    # 创建 ZIP 包
-   Compress-Archive -Path distribution/* -DestinationPath "Xii_Raw_Graph_Private_v1.0.0.zip"
+   Compress-Archive -Path distribution/* -DestinationPath "Xii_Raw_Graph_Private_v<version>.zip"
    ```
 
 3. **安全分享**
@@ -87,7 +87,7 @@
    <!-- internal-download.html -->
    <h1>Xii_Raw Graph - 内部下载</h1>
    <p>仅限授权用户下载</p>
-   <a href="Xii_Raw_Graph_v1.0.0.zip" download>下载应用</a>
+   <a href="Xii_Raw_Graph_Private_v&lt;version&gt;.zip" download>下载应用</a>
    ```
 
 2. **访问控制**

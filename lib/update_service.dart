@@ -3,12 +3,13 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 
 /// 版本更新服务 - 检查并管理应用版本更新
 class UpdateService {
-  // 版本检查服务器 URL（你需要替换为自己的服务器）
+  // 版本检查元数据地址
   static const String _versionCheckUrl =
-      'https://raw.githubusercontent.com/your-repo/version.json';
+      'https://gitee.com/Xii_ALL/xii_-raw_-graph/raw/main/version.json';
 
   /// 获取远程版本信息
   static Future<VersionInfo?> checkForUpdates({
@@ -29,13 +30,13 @@ class UpdateService {
     return null;
   }
 
-  /// 启动 MSIX / App Installer 更新流程
+  /// 下载并提示安装便携版更新
   static Future<UpdateInstallResult> downloadAndInstallUpdate(
     VersionInfo versionInfo,
   ) async {
     try {
       if (!Platform.isWindows) {
-        return const UpdateInstallResult.failure('MSIX 更新仅支持 Windows 桌面版。');
+        return const UpdateInstallResult.failure('便携版更新仅支持 Windows 桌面版。');
       }
 
       final downloadUrl = versionInfo.downloadUrl.trim();
@@ -43,45 +44,40 @@ class UpdateService {
         return const UpdateInstallResult.failure('未配置更新下载地址。');
       }
 
-      final packageType = _detectPackageType(downloadUrl);
-      if (packageType == _UpdatePackageType.unsupported) {
-        return const UpdateInstallResult.failure(
-          '更新地址必须是 .appinstaller、.msix、.msixbundle、.appx 或 .appxbundle 文件。',
-        );
-      }
-
       final uri = Uri.tryParse(downloadUrl);
       if (uri == null) {
         return UpdateInstallResult.failure('更新地址格式无效: $downloadUrl');
       }
 
-      if (packageType == _UpdatePackageType.appInstaller) {
-        final launched = await _launchMsixInstallerUri(uri);
-        if (!launched) {
-          return const UpdateInstallResult.failure(
-              '无法启动 Windows App Installer。');
-        }
+      final packageType = _detectPackageTypeFromUri(uri);
 
+      if (packageType == _UpdatePackageType.zipPackage ||
+          packageType == _UpdatePackageType.executable) {
+        final localPackage = await _downloadPortablePackage(
+          uri: uri,
+          version: versionInfo.version,
+          packageType: packageType,
+        );
+        final opened = await _openFolderAndSelectFile(localPackage.path);
+        final suffix = opened ? '，并已为你打开所在目录。' : '。';
+        final actionHint = packageType == _UpdatePackageType.zipPackage
+            ? '请先解压 ZIP，再用新文件替换旧版本。'
+            : '请关闭旧版本后运行新文件。';
+
+        return UpdateInstallResult.success(
+          '便携版更新包已下载到：${localPackage.path}$suffix\n\n$actionHint',
+        );
+      }
+
+      final opened = await openDownloadUrl(downloadUrl);
+      if (opened) {
         return const UpdateInstallResult.success(
-          'Windows App Installer 已启动，请按系统提示完成升级。'
-          '\n\n如果安装时提示关闭当前应用，请确认关闭，安装完成后重新打开即可。',
+          '已为你打开更新下载页，请按页面提示获取最新版本。',
         );
       }
 
-      final localPackage = await _downloadMsixPackage(
-        uri: uri,
-        version: versionInfo.version,
-      );
-      final launched = await _openLocalInstaller(localPackage.path);
-      if (!launched) {
-        return UpdateInstallResult.failure(
-          '安装包已下载到 ${localPackage.path}，但无法自动打开，请手动双击安装。',
-        );
-      }
-
-      return const UpdateInstallResult.success(
-        'MSIX 安装包已打开，请按系统提示完成升级。'
-        '\n\n安装期间如果提示关闭当前应用，请确认关闭。',
+      return const UpdateInstallResult.failure(
+        '无法识别更新包类型，请手动打开下载链接。',
       );
     } catch (e) {
       stderr.writeln('更新启动失败: $e');
@@ -96,12 +92,6 @@ class UpdateService {
     if (target.isEmpty) return false;
 
     try {
-      final uri = Uri.tryParse(target);
-      if (uri != null &&
-          _detectPackageTypeFromUri(uri) == _UpdatePackageType.appInstaller) {
-        return _launchMsixInstallerUri(uri);
-      }
-
       await Process.start('explorer.exe', [target]);
       return true;
     } catch (e) {
@@ -148,91 +138,117 @@ class UpdateService {
         .toList();
   }
 
-  static _UpdatePackageType _detectPackageType(String downloadUrl) {
-    final uri = Uri.tryParse(downloadUrl);
-    if (uri == null) {
-      return _UpdatePackageType.unsupported;
-    }
-
-    return _detectPackageTypeFromUri(uri);
-  }
-
   static _UpdatePackageType _detectPackageTypeFromUri(Uri uri) {
     final lowerPath = uri.path.toLowerCase();
-    if (lowerPath.endsWith('.appinstaller')) {
-      return _UpdatePackageType.appInstaller;
+    if (lowerPath.endsWith('.zip')) {
+      return _UpdatePackageType.zipPackage;
     }
 
-    const msixExtensions = [
-      '.msix',
-      '.msixbundle',
-      '.appx',
-      '.appxbundle',
-    ];
-    if (msixExtensions.any(lowerPath.endsWith)) {
-      return _UpdatePackageType.msixPackage;
+    if (lowerPath.endsWith('.exe')) {
+      return _UpdatePackageType.executable;
     }
 
-    return _UpdatePackageType.unsupported;
+    return _UpdatePackageType.genericUrl;
   }
 
-  static Future<File> _downloadMsixPackage({
+  static Future<File> _downloadPortablePackage({
     required Uri uri,
     required String version,
+    required _UpdatePackageType packageType,
   }) async {
-    stderr.writeln('开始下载 MSIX 安装包: $uri');
-    final response = await http.get(uri).timeout(const Duration(seconds: 30));
+    stderr.writeln('开始下载便携版更新包: $uri');
+    final response = await http.get(uri).timeout(const Duration(seconds: 60));
 
     if (response.statusCode != 200) {
       throw Exception('下载失败: HTTP ${response.statusCode}');
     }
 
-    final tempDir =
-        await Directory.systemTemp.createTemp('xii_raw_graph_update_');
-    final filename = _resolvePackageFilename(uri, version);
-    final file = File(path.join(tempDir.path, filename));
+    final downloadDir = await _resolveDownloadsDirectory();
+    if (downloadDir == null) {
+      throw Exception('无法定位下载目录');
+    }
+
+    final defaultExtension =
+        packageType == _UpdatePackageType.zipPackage ? '.zip' : '.exe';
+    final filename = _resolvePackageFilename(
+      uri,
+      version,
+      defaultExtension: defaultExtension,
+    );
+    final file = await _resolveAvailableFile(downloadDir, filename);
     await file.writeAsBytes(response.bodyBytes, flush: true);
-    stderr.writeln('MSIX 安装包下载完成: ${file.path}');
+    stderr.writeln('便携版更新包下载完成: ${file.path}');
     return file;
   }
 
-  static String _resolvePackageFilename(Uri uri, String version) {
+  static String _resolvePackageFilename(
+    Uri uri,
+    String version, {
+    String defaultExtension = '.zip',
+  }) {
     final lastSegment =
         uri.pathSegments.isNotEmpty ? uri.pathSegments.last : '';
     if (lastSegment.isNotEmpty) {
       return lastSegment;
     }
 
-    return 'Xii_Raw_Graph_Update_v$version.msix';
+    return 'Xii_Raw_Graph_Update_v$version$defaultExtension';
   }
 
-  static Future<bool> _launchMsixInstallerUri(Uri uri) async {
-    final installerUri = 'ms-appinstaller:?source=${uri.toString()}';
-
+  static Future<bool> _openFolderAndSelectFile(String filePath) async {
     try {
-      await Process.start('explorer.exe', [installerUri]);
+      await Process.start('explorer.exe', ['/select,', filePath]);
       return true;
     } catch (e) {
-      stderr.writeln('启动 App Installer 失败: $e');
+      stderr.writeln('打开下载目录失败: $e');
       return false;
     }
   }
 
-  static Future<bool> _openLocalInstaller(String filePath) async {
-    try {
-      await Process.start('explorer.exe', [filePath]);
-      return true;
-    } catch (e) {
-      stderr.writeln('打开本地安装包失败: $e');
-      return false;
+  static Future<Directory?> _resolveDownloadsDirectory() async {
+    final downloadDir = await getDownloadsDirectory();
+    if (downloadDir != null) {
+      await downloadDir.create(recursive: true);
+      return downloadDir;
     }
+
+    final userProfile = Platform.environment['USERPROFILE'];
+    if (userProfile == null || userProfile.isEmpty) {
+      return null;
+    }
+
+    final fallbackDir = Directory(path.join(userProfile, 'Downloads'));
+    await fallbackDir.create(recursive: true);
+    return fallbackDir;
+  }
+
+  static Future<File> _resolveAvailableFile(
+    Directory directory,
+    String fileName,
+  ) async {
+    final sanitized = fileName.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
+    final extension = path.extension(sanitized);
+    final baseName = extension.isEmpty
+        ? sanitized
+        : sanitized.substring(0, sanitized.length - extension.length);
+
+    var candidate = File(path.join(directory.path, sanitized));
+    var counter = 1;
+    while (await candidate.exists()) {
+      candidate = File(
+        path.join(directory.path, '${baseName}_$counter$extension'),
+      );
+      counter++;
+    }
+
+    return candidate;
   }
 }
 
 enum _UpdatePackageType {
-  appInstaller,
-  msixPackage,
-  unsupported,
+  zipPackage,
+  executable,
+  genericUrl,
 }
 
 class UpdateInstallResult {

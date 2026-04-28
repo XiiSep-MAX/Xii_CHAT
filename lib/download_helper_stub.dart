@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
 Future<void> downloadImagePlatform(String url, {BuildContext? context}) async {
-  // Non-web platforms can implement native download behavior if needed.
-  // For now, the button will simply open the image URL in the browser or default viewer.
+  if (context == null) return;
+
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.hideCurrentSnackBar();
+  messenger.showSnackBar(
+    const SnackBar(content: Text('当前平台暂不支持图片下载。')),
+  );
 }

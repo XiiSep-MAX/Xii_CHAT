@@ -23,8 +23,8 @@
 
 1. **克隆项目**
    ```bash
-   git clone <your-repo-url>
-   cd ai_chat_app
+   git clone https://gitee.com/Xii_ALL/xii_-raw_-graph.git
+   cd xii_-raw_-graph
    ```
 
 2. **配置 API 密钥**
@@ -78,11 +78,8 @@ setx OPENAI_API_KEY "sk-your-openai-api-key-here"
 ### Windows 桌面应用
 
 ```bash
-# 构建发布版本
-flutter build windows --release
-
-# 创建 MSIX 安装包 (可选)
-flutter pub run msix:create
+# 构建并打包 ZIP 便携版
+build_release.bat
 ```
 
 ### Web 版本
@@ -145,7 +142,7 @@ test/
 
 ## 📞 联系方式
 
-如有问题，请通过 GitHub Issues 联系。
+如有问题，请通过 Gitee Issues 联系。
 
 ---
 

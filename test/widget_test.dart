@@ -20,6 +20,9 @@ void main() {
     // Verify that the input field is present
     expect(find.byType(TextField), findsOneWidget);
 
+    // Verify that the image picker button is present
+    expect(find.byIcon(Icons.add_photo_alternate_outlined), findsOneWidget);
+
     // Verify that the send button is present
     expect(find.byIcon(Icons.send_rounded), findsOneWidget);
   });

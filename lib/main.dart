@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:file_picker/file_picker.dart';
 
 import 'chat_service.dart';
 import 'download_helper.dart';
@@ -59,8 +60,9 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final OpenAIChatService _chatService = OpenAIChatService();
+  ChatImageAttachment? _selectedImageAttachment;
   bool _isSending = false;
-  static const String _appVersion = '1.0.0'; // 当前应用版本
+  static const String _appVersion = '1.1.0'; // 当前应用版本，需与 pubspec.yaml / version.json 保持一致
 
   @override
   void initState() {
@@ -121,7 +123,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   Navigator.pop(context);
                   await _openDownloadUrl(versionInfo.downloadUrl);
                 },
-                child: const Text('打开链接'),
+                child: const Text('打开下载页'),
               ),
               const SizedBox(width: 8),
               ElevatedButton(
@@ -129,7 +131,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   Navigator.pop(context);
                   await _downloadAndInstallUpdate(versionInfo);
                 },
-                child: const Text('安装更新'),
+                child: const Text('下载更新'),
               ),
             ],
           ),
@@ -152,7 +154,7 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             CircularProgressIndicator(),
             SizedBox(height: 16),
-            Text('正在启动 Windows 安装程序，请稍候...'),
+            Text('正在获取最新更新包，请稍候...'),
           ],
         ),
       ),
@@ -169,7 +171,7 @@ class _ChatScreenState extends State<ChatScreen> {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('🚀 安装程序已启动'),
+            title: const Text('🚀 更新已准备好'),
             content: Text(result.message),
             actions: [
               TextButton(
@@ -238,19 +240,98 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final file = result.files.single;
+      final bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        _showSnackBar('暂时无法读取所选图片，请更换一张后重试。');
+        return;
+      }
+
+      setState(() {
+        _selectedImageAttachment = ChatImageAttachment(
+          bytes: bytes,
+          name: file.name,
+          mimeType: _resolveMimeType(file.name),
+        );
+      });
+    } catch (e) {
+      _showSnackBar('选择图片失败：$e');
+    }
+  }
+
+  void _removeSelectedImage() {
+    setState(() {
+      _selectedImageAttachment = null;
+    });
+  }
+
+  void _showSnackBar(String message) {
+    if (!mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  String _resolveMimeType(String fileName) {
+    final extensionIndex = fileName.lastIndexOf('.');
+    if (extensionIndex < 0 || extensionIndex == fileName.length - 1) {
+      return 'image/png';
+    }
+
+    switch (fileName.substring(extensionIndex + 1).toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'bmp':
+        return 'image/bmp';
+      case 'heic':
+      case 'heif':
+        return 'image/heic';
+      default:
+        return 'image/png';
+    }
+  }
+
   Future<void> _handleSend() async {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
+    final imageAttachment = _selectedImageAttachment;
+    if (text.isEmpty && imageAttachment == null) return;
 
     setState(() {
-      _messages.add(ChatMessage(text: text, role: Role.user));
+      _messages.add(ChatMessage(
+        text: text,
+        role: Role.user,
+        localImages: imageAttachment == null ? const [] : [imageAttachment],
+      ));
       _isSending = true;
       _controller.clear();
+      _selectedImageAttachment = null;
     });
     _scrollToBottom();
 
     try {
-      final response = await _chatService.sendMessage(prompt: text);
+      final response = await _chatService.sendMessage(
+        prompt: text,
+        imageAttachment: imageAttachment,
+      );
       setState(() {
         _messages.add(ChatMessage(
           text: response.text,
@@ -448,97 +529,149 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ],
               ),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceVariant
-                            .withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .outline
-                              .withOpacity(0.2),
-                          width: 1,
-                        ),
-                      ),
-                      child: TextField(
-                        controller: _controller,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => _handleSend(),
-                        enabled: !_isSending,
-                        maxLines: null,
-                        decoration: InputDecoration(
-                          hintText: '输入您的问题...',
-                          hintStyle: TextStyle(
+                  if (_selectedImageAttachment != null) ...[
+                    _ComposerImagePreview(
+                      attachment: _selectedImageAttachment!,
+                      onRemove: _isSending ? null : _removeSelectedImage,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: _selectedImageAttachment == null
+                              ? Theme.of(context)
+                                  .colorScheme
+                                  .surfaceVariant
+                                  .withOpacity(0.3)
+                              : Theme.of(context)
+                                  .colorScheme
+                                  .primaryContainer
+                                  .withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
                             color: Theme.of(context)
                                 .colorScheme
-                                .onSurfaceVariant
-                                .withOpacity(0.6),
+                                .outline
+                                .withOpacity(0.2),
+                            width: 1,
                           ),
-                          prefixIcon: Icon(
-                            Icons.chat_bubble_outline_rounded,
+                        ),
+                        child: IconButton(
+                          onPressed: _isSending ? null : _pickImage,
+                          tooltip: '选择图片',
+                          icon: Icon(
+                            _selectedImageAttachment == null
+                                ? Icons.add_photo_alternate_outlined
+                                : Icons.image_rounded,
                             color: Theme.of(context).colorScheme.primary,
                           ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: _isSending ? 48 : 80,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: _isSending
-                            ? [Colors.grey.shade400, Colors.grey.shade500]
-                            : [Colors.blue.shade500, Colors.purple.shade500],
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: (_isSending ? Colors.grey : Colors.blue)
-                              .withOpacity(0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: ElevatedButton(
-                      onPressed: _isSending ? null : _handleSend,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        shadowColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(48, 48),
-                      ),
-                      child: _isSending
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : const Icon(
-                              Icons.send_rounded,
-                              color: Colors.white,
-                              size: 20,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceVariant
+                                .withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .outline
+                                  .withOpacity(0.2),
+                              width: 1,
                             ),
-                    ),
+                          ),
+                          child: TextField(
+                            controller: _controller,
+                            textInputAction: TextInputAction.send,
+                            onSubmitted: (_) => _handleSend(),
+                            enabled: !_isSending,
+                            maxLines: null,
+                            decoration: InputDecoration(
+                              hintText: _selectedImageAttachment == null
+                                  ? '输入您的问题...'
+                                  : '输入描述，和图片一起发送...',
+                              hintStyle: TextStyle(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant
+                                    .withOpacity(0.6),
+                              ),
+                              prefixIcon: Icon(
+                                Icons.chat_bubble_outline_rounded,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 12),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: _isSending ? 48 : 80,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: _isSending
+                                ? [Colors.grey.shade400, Colors.grey.shade500]
+                                : [
+                                    Colors.blue.shade500,
+                                    Colors.purple.shade500
+                                  ],
+                          ),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: (_isSending ? Colors.grey : Colors.blue)
+                                  .withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: ElevatedButton(
+                          onPressed: _isSending ? null : _handleSend,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(48, 48),
+                          ),
+                          child: _isSending
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.send_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -708,77 +841,67 @@ class ChatBubble extends StatelessWidget {
                     ),
                   ),
                 if (message.hasImages) const SizedBox(height: 12),
-                for (final imageUrl in message.imageUrls) ...[
-                  Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                for (final localImage in message.localImages) ...[
+                  _ChatImageFrame(
+                    child: Image.memory(
+                      localImage.bytes,
+                      fit: BoxFit.cover,
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          maxHeight: 300,
-                          maxWidth: 350,
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                for (final imageUrl in message.imageUrls) ...[
+                  _ChatImageFrame(
+                    child: CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        width: double.infinity,
+                        height: 240,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        child: CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            width: double.infinity,
-                            height: 240,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            alignment: Alignment.center,
-                            child: const SizedBox(
-                              width: 32,
-                              height: 32,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.grey),
-                              ),
-                            ),
+                        alignment: Alignment.center,
+                        child: const SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.grey),
                           ),
-                          errorWidget: (context, url, error) => Container(
-                            width: double.infinity,
-                            height: 240,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            alignment: Alignment.center,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.broken_image,
-                                  color: Colors.grey.shade500,
-                                  size: 48,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  '无法加载图片',
-                                  style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          fadeInDuration: const Duration(milliseconds: 300),
-                          useOldImageOnUrlChange: true,
                         ),
                       ),
+                      errorWidget: (context, url, error) => Container(
+                        width: double.infinity,
+                        height: 240,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        alignment: Alignment.center,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.broken_image,
+                              color: Colors.grey.shade500,
+                              size: 48,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '无法加载图片',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      fadeInDuration: const Duration(milliseconds: 300),
+                      useOldImageOnUrlChange: true,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -798,7 +921,10 @@ class ChatBubble extends StatelessWidget {
                         ],
                       ),
                       child: TextButton.icon(
-                        onPressed: () => downloadImagePlatform(imageUrl),
+                        onPressed: () async => downloadImagePlatform(
+                          imageUrl,
+                          context: context,
+                        ),
                         icon: Icon(
                           Icons.download_rounded,
                           color: Theme.of(context).colorScheme.primary,
@@ -828,6 +954,107 @@ class ChatBubble extends StatelessWidget {
           if (isUser) const SizedBox(width: 12),
           if (isUser) avatar,
         ],
+      ),
+    );
+  }
+}
+
+class _ComposerImagePreview extends StatelessWidget {
+  final ChatImageAttachment attachment;
+  final VoidCallback? onRemove;
+
+  const _ComposerImagePreview({
+    required this.attachment,
+    this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.25),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.15),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Image.memory(
+              attachment.bytes,
+              width: 64,
+              height: 64,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '已选择图片',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  attachment.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onRemove,
+            tooltip: '移除图片',
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChatImageFrame extends StatelessWidget {
+  final Widget child;
+
+  const _ChatImageFrame({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxHeight: 300,
+            maxWidth: 350,
+          ),
+          child: child,
+        ),
       ),
     );
   }

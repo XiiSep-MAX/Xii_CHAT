@@ -198,18 +198,18 @@ Future<List<TestResult>> validateBuildConfiguration(String projectRoot) async {
   if (await pubspecFile.exists()) {
     final content = await pubspecFile.readAsString();
 
-    results.add(
-        TestResult('MSIX 配置存在', content.contains('msix:'), 'MSIX 构建配置未找到'));
+    final releaseScript =
+        File(path.join(projectRoot, 'build_release.bat'));
+    results.add(TestResult(
+        'ZIP 发布脚本存在', await releaseScript.exists(), 'build_release.bat 未找到'));
+
+    final appIconFile = File(
+        path.join(projectRoot, 'windows', 'runner', 'resources', 'app_icon.ico'));
+    results.add(TestResult('应用图标资源存在', await appIconFile.exists(),
+        'windows/runner/resources/app_icon.ico 未找到'));
 
     results.add(TestResult(
-        '应用图标配置存在',
-        content.contains('app_icon.ico') || content.contains('icon'),
-        '应用图标配置未找到'));
-
-    results.add(TestResult(
-        '发布者信息配置存在',
-        content.contains('publisher:') || content.contains('CN='),
-        '发布者信息配置未找到'));
+        '版本配置存在', content.contains('version:'), '应用版本配置未找到'));
   }
 
   // 检查Windows构建配置
