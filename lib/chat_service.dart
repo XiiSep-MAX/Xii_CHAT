@@ -19,10 +19,36 @@ class ChatResponse {
 }
 
 class OpenAIChatService {
-  static const _apiBaseUrl = 'https://lanfengai.cn';
-  static const _imageGenerationUrl = '$_apiBaseUrl/v1/images/generations';
-  static const _imageEditUrl = '$_apiBaseUrl/v1/images/edits';
-  static const _model = 'gpt-image-2';
+  static final _imageMarkdownRegex =
+      RegExp(r'!\[[^\]]*\]\((https?://[^\s)]+)\)');
+  static final _directImageUrlRegex = RegExp(
+    r'https?://[^\s]+?\.(?:png|jpe?g|webp|gif)(?:\?[^\s)]*)?',
+    caseSensitive: false,
+  );
+
+  static String get _apiUrl {
+    final configuredBaseUrl = EnvConfig.get('OPENAI_BASE_URL')?.trim();
+    if (configuredBaseUrl != null && configuredBaseUrl.isNotEmpty) {
+      final trimmed = configuredBaseUrl.replaceAll(RegExp(r'/+$'), '');
+      if (trimmed.endsWith('/chat/completions')) {
+        return trimmed;
+      }
+      if (trimmed.endsWith('/v1')) {
+        return '$trimmed/chat/completions';
+      }
+      return '$trimmed/v1/chat/completions';
+    }
+
+    return 'https://www.packyapi.com/v1/chat/completions';
+  }
+
+  static String get _model {
+    final configuredModel = EnvConfig.get('OPENAI_IMAGE_MODEL')?.trim();
+    if (configuredModel != null && configuredModel.isNotEmpty) {
+      return configuredModel;
+    }
+    return 'gpt-image-2';
+  }
 
   Future<ChatResponse> sendMessage({
     required String prompt,
@@ -34,175 +60,91 @@ class OpenAIChatService {
     }
 
     final normalizedOptions = options.normalized();
-    if (imageAttachment == null) {
-      return _sendGenerationRequest(
-        prompt: prompt,
-        options: normalizedOptions,
-      );
-    }
-
-    return _sendEditRequest(
+    final composedPrompt = _composePrompt(
       prompt: prompt,
       options: normalizedOptions,
-      imageAttachment: imageAttachment,
+      hasReferenceImage: imageAttachment != null,
     );
-  }
 
-  Future<ChatResponse> _sendGenerationRequest({
-    required String prompt,
-    required ImageGenerationOptions options,
-  }) async {
     final response = await http.post(
-      Uri.parse(_imageGenerationUrl),
-      headers: _jsonHeaders,
+      Uri.parse(_apiUrl),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $openAIApiKey',
+      },
       body: jsonEncode({
         'model': _model,
-        'prompt': _composePrompt(prompt, options),
-        'size': options.aspectRatio,
-        'resolution': options.resolution,
-        'output_format': options.outputFormat,
-        'quality': 'auto',
-        'moderation': 'auto',
-        'background': 'auto',
-        'n': 1,
+        'messages': [
+          {
+            'role': 'user',
+            'content': _buildMessageContent(
+              prompt: composedPrompt,
+              imageAttachment: imageAttachment,
+            ),
+          },
+        ],
+        'temperature': 0.8,
       }),
     );
 
-    return _parseImageResponse(
-      response,
-      options: options,
-      isEditRequest: false,
-    );
-  }
-
-  Future<ChatResponse> _sendEditRequest({
-    required String prompt,
-    required ImageGenerationOptions options,
-    required ChatImageAttachment imageAttachment,
-  }) async {
-    final request = http.MultipartRequest(
-      'POST',
-      Uri.parse(_imageEditUrl),
-    );
-
-    request.headers.addAll(_authHeaders);
-    request.fields.addAll({
-      'model': _model,
-      'prompt': _composePrompt(
-        prompt.isEmpty ? '请基于输入图片生成新的画面。' : prompt,
-        options,
-      ),
-      'size': options.aspectRatio,
-      'resolution': options.resolution,
-      'output_format': options.outputFormat,
-      'quality': 'auto',
-      'moderation': 'auto',
-      'background': 'auto',
-      'n': '1',
-    });
-    request.files.add(
-      http.MultipartFile.fromBytes(
-        'image',
-        imageAttachment.bytes,
-        filename: imageAttachment.name,
-      ),
-    );
-
-    final streamedResponse = await request.send();
-    final response = await http.Response.fromStream(streamedResponse);
-
-    return _parseImageResponse(
-      response,
-      options: options,
-      isEditRequest: true,
-    );
-  }
-
-  Map<String, String> get _authHeaders => {
-        'Authorization': 'Bearer $openAIApiKey',
-      };
-
-  Map<String, String> get _jsonHeaders => {
-        ..._authHeaders,
-        'Content-Type': 'application/json',
-      };
-
-  String _composePrompt(String prompt, ImageGenerationOptions options) {
-    final trimmedPrompt = prompt.trim();
-    final suffix =
-        '生成要求：尺寸比例 ${options.aspectRatio}，分辨率 ${options.resolution.toUpperCase()}，输出格式 ${options.outputFormat.toUpperCase()}。';
-
-    if (trimmedPrompt.isEmpty) {
-      return suffix;
-    }
-
-    return '$trimmedPrompt\n\n$suffix';
-  }
-
-  ChatResponse _parseImageResponse(
-    http.Response response, {
-    required ImageGenerationOptions options,
-    required bool isEditRequest,
-  }) {
-    final body = _decodeJson(response.body);
+    final body = _decodeJsonFromResponse(response);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception(_extractErrorMessage(response, body));
     }
 
-    final data = body['data'];
-    if (data is! List || data.isEmpty) {
-      throw Exception('接口已返回成功，但没有拿到图片结果。');
+    final content = _extractResponseContent(body);
+    if (content == null) {
+      throw Exception('无法解析 PackyAPI 响应。');
     }
 
-    final generatedImages = <GeneratedImageAsset>[];
-    for (var index = 0; index < data.length; index++) {
-      final item = data[index];
-      if (item is! Map) {
-        continue;
-      }
-
-      final fileName = _resolveFileName(item, options, index);
-      if (item['b64_json'] is String &&
-          (item['b64_json'] as String).isNotEmpty) {
-        generatedImages.add(
-          GeneratedImageAsset(
-            bytes: base64Decode(item['b64_json'].toString()),
-            fileName: fileName,
-            mimeType: mimeTypeForOutputFormat(options.outputFormat),
-          ),
-        );
-        continue;
-      }
-
-      if (item['url'] is String && (item['url'] as String).isNotEmpty) {
-        generatedImages.add(
-          GeneratedImageAsset(
-            imageUrl: item['url'].toString(),
-            fileName: fileName,
-            mimeType: mimeTypeForOutputFormat(options.outputFormat),
-          ),
-        );
-      }
-    }
-
-    if (generatedImages.isEmpty) {
-      throw Exception('接口响应中未找到可展示的图片数据。');
-    }
-
-    final revisedPrompt = _extractRevisedPrompt(data);
-    final action = isEditRequest ? '已完成参考图生成' : '已完成图片生成';
-    final baseText = '$action，共 ${generatedImages.length} 张。';
-    final text =
-        revisedPrompt.isEmpty ? baseText : '$baseText\n优化提示词：$revisedPrompt';
-
-    return ChatResponse(
-      text: text,
-      generatedImages: generatedImages,
+    return _parseResponseContent(
+      content,
+      options: normalizedOptions,
+      isEditRequest: imageAttachment != null,
     );
   }
 
-  Map<String, dynamic> _decodeJson(String rawBody) {
-    if (rawBody.trim().isEmpty) {
+  String _composePrompt({
+    required String prompt,
+    required ImageGenerationOptions options,
+    required bool hasReferenceImage,
+  }) {
+    final trimmedPrompt = prompt.trim();
+    final basePrompt = trimmedPrompt.isEmpty
+        ? (hasReferenceImage ? '请基于输入图片生成新的画面。' : '请生成一张图片。')
+        : trimmedPrompt;
+
+    return '$basePrompt\n\n'
+        '生成要求：尺寸比例 ${options.aspectRatio}。';
+  }
+
+  Object _buildMessageContent({
+    required String prompt,
+    ChatImageAttachment? imageAttachment,
+  }) {
+    if (imageAttachment == null) {
+      return prompt;
+    }
+
+    return [
+      {'type': 'text', 'text': prompt},
+      {
+        'type': 'image_url',
+        'image_url': {
+          'url': _buildDataUrl(imageAttachment),
+        },
+      },
+    ];
+  }
+
+  String _buildDataUrl(ChatImageAttachment attachment) {
+    final encoded = base64Encode(attachment.bytes);
+    return 'data:${attachment.mimeType};base64,$encoded';
+  }
+
+  Map<String, dynamic> _decodeJsonFromResponse(http.Response response) {
+    final rawBody = utf8.decode(response.bodyBytes, allowMalformed: true).trim();
+    if (rawBody.isEmpty) {
       return const <String, dynamic>{};
     }
 
@@ -212,6 +154,126 @@ class OpenAIChatService {
     }
 
     return <String, dynamic>{'data': decoded};
+  }
+
+  dynamic _extractResponseContent(Map<String, dynamic> body) {
+    final choices = body['choices'];
+    if (choices is List && choices.isNotEmpty) {
+      final firstChoice = choices.first;
+      if (firstChoice is Map) {
+        final message = firstChoice['message'];
+        if (message is Map && message['content'] != null) {
+          return message['content'];
+        }
+      }
+    }
+
+    if (body['data'] != null) {
+      return body['data'];
+    }
+
+    return null;
+  }
+
+  ChatResponse _parseResponseContent(
+    dynamic content, {
+    required ImageGenerationOptions options,
+    required bool isEditRequest,
+  }) {
+    final generatedImages = <GeneratedImageAsset>[];
+    final textParts = <String>[];
+    final seenUrls = <String>{};
+
+    void addImageUrl(String url) {
+      final normalizedUrl = url.trim();
+      if (normalizedUrl.isEmpty || !seenUrls.add(normalizedUrl)) {
+        return;
+      }
+
+      generatedImages.add(
+        GeneratedImageAsset(
+          imageUrl: normalizedUrl,
+          fileName: _resolveFileNameFromUrl(normalizedUrl, options),
+          mimeType: _resolveMimeTypeFromUrl(normalizedUrl),
+        ),
+      );
+    }
+
+    void addText(String value) {
+      final stripped = _stripImageMarkdown(value).trim();
+      if (stripped.isNotEmpty) {
+        textParts.add(stripped);
+      }
+      for (final url in _extractImageUrls(value)) {
+        addImageUrl(url);
+      }
+    }
+
+    if (content is String) {
+      addText(content);
+    } else if (content is List) {
+      for (final item in content) {
+        if (item is! Map) {
+          continue;
+        }
+
+        final type = item['type']?.toString();
+        if ((type == 'text' || type == 'output_text') && item['text'] != null) {
+          addText(item['text'].toString());
+          continue;
+        }
+
+        if ((type == 'image_url' || type == 'output_image') &&
+            item['image_url'] != null) {
+          final imagePart = item['image_url'];
+          if (imagePart is Map && imagePart['url'] != null) {
+            addImageUrl(imagePart['url'].toString());
+          } else if (imagePart is String) {
+            addImageUrl(imagePart);
+          }
+          continue;
+        }
+
+        if (item['text'] != null) {
+          addText(item['text'].toString());
+        }
+
+        final directUrl = _readImageUrlFromMap(item);
+        if (directUrl != null) {
+          addImageUrl(directUrl);
+        }
+      }
+    } else if (content is Map) {
+      if (content['text'] != null) {
+        addText(content['text'].toString());
+      }
+
+      final directUrl = _readImageUrlFromMap(content);
+      if (directUrl != null) {
+        addImageUrl(directUrl);
+      }
+    } else {
+      final fallbackText = content.toString().trim();
+      if (fallbackText.isNotEmpty) {
+        addText(fallbackText);
+      }
+    }
+
+    final responseText = textParts.join('\n\n').trim();
+    if (generatedImages.isNotEmpty) {
+      final action = isEditRequest ? '已完成参考图生成' : '已完成图片生成';
+      final fallbackText = '$action，共 ${generatedImages.length} 张。';
+      return ChatResponse(
+        text: responseText.isEmpty ? fallbackText : responseText,
+        generatedImages: generatedImages,
+      );
+    }
+
+    if (responseText.isNotEmpty) {
+      return ChatResponse(text: responseText);
+    }
+
+    throw Exception('接口已返回成功，但没有解析到图片结果。');
   }
 
   String _extractErrorMessage(
@@ -229,37 +291,76 @@ class OpenAIChatService {
         .trim();
   }
 
-  String _extractRevisedPrompt(List<dynamic> data) {
-    for (final item in data) {
-      if (item is Map && item['revised_prompt'] != null) {
-        final revisedPrompt = item['revised_prompt'].toString().trim();
-        if (revisedPrompt.isNotEmpty) {
-          return revisedPrompt;
-        }
+  List<String> _extractImageUrls(String text) {
+    final imageUrls = <String>[];
+
+    for (final match in _imageMarkdownRegex.allMatches(text)) {
+      final url = match.group(1);
+      if (url != null && url.isNotEmpty) {
+        imageUrls.add(url);
       }
     }
 
-    return '';
+    for (final match in _directImageUrlRegex.allMatches(text)) {
+      final url = match.group(0);
+      if (url != null && url.isNotEmpty) {
+        imageUrls.add(url);
+      }
+    }
+
+    return imageUrls;
   }
 
-  String _resolveFileName(
-    Map item,
-    ImageGenerationOptions options,
-    int index,
-  ) {
-    final url = item['url']?.toString();
-    if (url != null && url.isNotEmpty) {
-      final uri = Uri.tryParse(url);
-      if (uri != null && uri.pathSegments.isNotEmpty) {
-        final lastSegment = uri.pathSegments.last.trim();
-        if (lastSegment.isNotEmpty) {
-          return lastSegment;
-        }
+  String _stripImageMarkdown(String text) {
+    return text.replaceAll(_imageMarkdownRegex, '').trim();
+  }
+
+  String? _readImageUrlFromMap(Map<dynamic, dynamic> item) {
+    final candidates = [
+      item['url'],
+      item['image_url'],
+      item['imageUrl'],
+      item['output_url'],
+      item['outputUrl'],
+    ];
+
+    for (final candidate in candidates) {
+      final url = candidate?.toString().trim();
+      if (url != null && url.isNotEmpty) {
+        return url;
       }
     }
 
-    final extension = extensionForOutputFormat(options.outputFormat);
+    return null;
+  }
+
+  String _resolveFileNameFromUrl(
+    String url,
+    ImageGenerationOptions options,
+  ) {
+    final uri = Uri.tryParse(url);
+    if (uri != null && uri.pathSegments.isNotEmpty) {
+      final lastSegment = uri.pathSegments.last.trim();
+      if (lastSegment.isNotEmpty) {
+        return lastSegment;
+      }
+    }
+
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    return 'lanfeng_${options.resolution}_${options.aspectRatio.replaceAll(':', 'x')}_${index + 1}_$timestamp.$extension';
+    return 'packy_${options.aspectRatio.replaceAll(':', 'x')}_$timestamp.png';
+  }
+
+  String _resolveMimeTypeFromUrl(String url) {
+    final lowerUrl = url.toLowerCase();
+    if (lowerUrl.contains('.jpg') || lowerUrl.contains('.jpeg')) {
+      return 'image/jpeg';
+    }
+    if (lowerUrl.contains('.webp')) {
+      return 'image/webp';
+    }
+    if (lowerUrl.contains('.gif')) {
+      return 'image/gif';
+    }
+    return 'image/png';
   }
 }

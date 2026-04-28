@@ -285,34 +285,10 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _updateResolution(String resolution) {
-    final previousRatio = _generationOptions.aspectRatio;
-    final nextOptions = _generationOptions.copyWith(
-      resolution: resolution,
-    );
-
-    setState(() {
-      _generationOptions = nextOptions;
-    });
-
-    if (previousRatio != nextOptions.aspectRatio &&
-        resolution == ImageResolutionOption.fourK) {
-      _showSnackBar('4K 仅支持部分宽高比，已自动切换为 ${nextOptions.aspectRatio}。');
-    }
-  }
-
   void _updateAspectRatio(String aspectRatio) {
     setState(() {
       _generationOptions = _generationOptions.copyWith(
         aspectRatio: aspectRatio,
-      );
-    });
-  }
-
-  void _updateOutputFormat(String outputFormat) {
-    setState(() {
-      _generationOptions = _generationOptions.copyWith(
-        outputFormat: outputFormat,
       );
     });
   }
@@ -412,7 +388,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final currentPrice =
-        '\$${_generationOptions.priceUsd.toStringAsFixed(2)}/张';
+        '\$${ImageGenerationOptions.unitPriceUsd.toStringAsFixed(2)}/张';
 
     return Scaffold(
       appBar: AppBar(
@@ -535,7 +511,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '支持尺寸比例、1K/2K/4K 分辨率和 PNG/JPEG/WEBP 输出格式选择。当前仅支持图片生成。',
+                      '支持常规尺寸比例选择，价格统一 \$0.08/张。当前仅支持图片生成。',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
@@ -623,9 +599,6 @@ class _ChatScreenState extends State<ChatScreen> {
                     currentPrice: currentPrice,
                     onAspectRatioChanged:
                         _isSending ? null : _updateAspectRatio,
-                    onOutputFormatChanged:
-                        _isSending ? null : _updateOutputFormat,
-                    onResolutionChanged: _isSending ? null : _updateResolution,
                   ),
                   const SizedBox(height: 12),
                   if (_selectedImageAttachment != null) ...[
@@ -1142,22 +1115,17 @@ class ChatBubble extends StatelessWidget {
 class _GenerationOptionsPanel extends StatelessWidget {
   final ImageGenerationOptions options;
   final String currentPrice;
-  final ValueChanged<String>? onResolutionChanged;
   final ValueChanged<String>? onAspectRatioChanged;
-  final ValueChanged<String>? onOutputFormatChanged;
 
   const _GenerationOptionsPanel({
     required this.options,
     required this.currentPrice,
-    this.onResolutionChanged,
     this.onAspectRatioChanged,
-    this.onOutputFormatChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    final availableRatios =
-        ImageGenerationOptions.availableAspectRatiosFor(options.resolution);
+    final availableRatios = ImageGenerationOptions.availableAspectRatios();
 
     return Container(
       width: double.infinity,
@@ -1227,77 +1195,13 @@ class _GenerationOptionsPanel extends StatelessWidget {
                       onChanged: onAspectRatioChanged,
                     ),
                   ),
-                  SizedBox(
-                    width: fieldWidth,
-                    child: _OptionDropdown(
-                      label: '分辨率',
-                      value: options.resolution,
-                      items: ImageResolutionOption.values,
-                      labelBuilder: ImageResolutionOption.labelOf,
-                      onChanged: onResolutionChanged,
-                    ),
-                  ),
-                  SizedBox(
-                    width: fieldWidth,
-                    child: _OptionDropdown(
-                      label: '输出格式',
-                      value: options.outputFormat,
-                      items: OutputFormatOption.values,
-                      labelBuilder: OutputFormatOption.labelOf,
-                      onChanged: onOutputFormatChanged,
-                    ),
-                  ),
                 ],
               );
             },
           ),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: ImageResolutionOption.values.map((resolution) {
-              final selected = options.resolution == resolution;
-              final price =
-                  ImageGenerationOptions.resolutionPrices[resolution]!;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? Theme.of(context)
-                          .colorScheme
-                          .primaryContainer
-                          .withOpacity(0.9)
-                      : Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: selected
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context)
-                            .colorScheme
-                            .outline
-                            .withOpacity(0.2),
-                  ),
-                ),
-                child: Text(
-                  '${ImageResolutionOption.labelOf(resolution)}: \$${price.toStringAsFixed(2)}/张',
-                  style: TextStyle(
-                    color: selected
-                        ? Theme.of(context).colorScheme.onPrimaryContainer
-                        : Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 10),
           Text(
-            options.resolution == ImageResolutionOption.fourK
-                ? '4K 仅支持 16:9、9:16、2:1、1:2、21:9、9:21。'
-                : '1K / 2K 额外开放 1:1、2:3、3:2、4:3、3:4、5:4、4:5 等更多比例。',
+            '当前仅保留常规尺寸比例选择，价格统一 $currentPrice。',
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 12,
@@ -1315,14 +1219,12 @@ class _OptionDropdown extends StatelessWidget {
   final String value;
   final List<String> items;
   final ValueChanged<String>? onChanged;
-  final String Function(String value)? labelBuilder;
 
   const _OptionDropdown({
     required this.label,
     required this.value,
     required this.items,
     this.onChanged,
-    this.labelBuilder,
   });
 
   @override
@@ -1346,7 +1248,7 @@ class _OptionDropdown extends StatelessWidget {
           .map(
             (item) => DropdownMenuItem<String>(
               value: item,
-              child: Text(labelBuilder?.call(item) ?? item),
+              child: Text(item),
             ),
           )
           .toList(),
@@ -1378,16 +1280,8 @@ class _MessageOptionSummary extends StatelessWidget {
       runSpacing: 8,
       children: [
         _SummaryChip(
-          icon: Icons.hd_rounded,
-          label: ImageResolutionOption.labelOf(options.resolution),
-        ),
-        _SummaryChip(
           icon: Icons.crop_rounded,
           label: options.aspectRatio,
-        ),
-        _SummaryChip(
-          icon: Icons.insert_photo_outlined,
-          label: OutputFormatOption.labelOf(options.outputFormat),
         ),
       ],
     );

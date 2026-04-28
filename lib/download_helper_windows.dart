@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
+import 'image_download_metadata.dart';
 import 'models.dart';
 
 Future<void> downloadImagePlatform(
@@ -21,9 +22,14 @@ Future<void> downloadImagePlatform(
       return;
     }
 
-    final file = await _resolveAvailableFile(downloadDir, image.fileName);
-
     if (image.hasBytes) {
+      final metadata = resolveImageDownloadMetadata(
+        fileName: image.fileName,
+        imageUrl: image.imageUrl,
+        contentType: image.mimeType,
+        bytes: image.bytes,
+      );
+      final file = await _resolveAvailableFile(downloadDir, metadata.fileName);
       await file.writeAsBytes(image.bytes!, flush: true);
       _showSnackBar(messenger, '图片已保存：${path.basename(file.path)}');
       return;
@@ -41,6 +47,13 @@ Future<void> downloadImagePlatform(
       return;
     }
 
+    final metadata = resolveImageDownloadMetadata(
+      fileName: image.fileName,
+      imageUrl: image.imageUrl,
+      contentType: response.headers['content-type'] ?? image.mimeType,
+      bytes: response.bodyBytes,
+    );
+    final file = await _resolveAvailableFile(downloadDir, metadata.fileName);
     await file.writeAsBytes(response.bodyBytes, flush: true);
     _showSnackBar(messenger, '图片已保存：${path.basename(file.path)}');
   } on SocketException {

@@ -35,28 +35,8 @@ class GeneratedImageAsset {
   bool get hasUrl => imageUrl != null && imageUrl!.isNotEmpty;
 }
 
-class ImageResolutionOption {
-  static const String oneK = '1k';
-  static const String twoK = '2k';
-  static const String fourK = '4k';
-
-  static const List<String> values = [oneK, twoK, fourK];
-
-  static String labelOf(String value) => value.toUpperCase();
-}
-
-class OutputFormatOption {
-  static const String png = 'png';
-  static const String jpeg = 'jpeg';
-  static const String webp = 'webp';
-
-  static const List<String> values = [png, jpeg, webp];
-
-  static String labelOf(String value) => value.toUpperCase();
-}
-
 class ImageGenerationOptions {
-  static const List<String> fullAspectRatios = [
+  static const List<String> commonAspectRatios = [
     '1:1',
     '3:2',
     '2:3',
@@ -66,111 +46,45 @@ class ImageGenerationOptions {
     '4:5',
     '16:9',
     '9:16',
-    '2:1',
-    '1:2',
-    '21:9',
-    '9:21',
   ];
 
-  static const List<String> fourKAspectRatios = [
-    '16:9',
-    '9:16',
-    '2:1',
-    '1:2',
-    '21:9',
-    '9:21',
-  ];
-
-  static const Map<String, double> resolutionPrices = {
-    ImageResolutionOption.oneK: 0.08,
-    ImageResolutionOption.twoK: 0.16,
-    ImageResolutionOption.fourK: 0.32,
-  };
+  static const double unitPriceUsd = 0.08;
 
   final String aspectRatio;
-  final String resolution;
-  final String outputFormat;
 
   const ImageGenerationOptions({
     required this.aspectRatio,
-    required this.resolution,
-    required this.outputFormat,
   });
 
   factory ImageGenerationOptions.defaults() {
-    return const ImageGenerationOptions(
-      aspectRatio: '1:1',
-      resolution: ImageResolutionOption.oneK,
-      outputFormat: OutputFormatOption.png,
-    );
+    return const ImageGenerationOptions(aspectRatio: '1:1');
   }
 
   ImageGenerationOptions copyWith({
     String? aspectRatio,
-    String? resolution,
-    String? outputFormat,
   }) {
     return ImageGenerationOptions(
       aspectRatio: aspectRatio ?? this.aspectRatio,
-      resolution: resolution ?? this.resolution,
-      outputFormat: outputFormat ?? this.outputFormat,
     ).normalized();
   }
 
   ImageGenerationOptions normalized() {
-    final normalizedResolution =
-        ImageResolutionOption.values.contains(resolution)
-            ? resolution
-            : ImageResolutionOption.oneK;
-    final normalizedFormat = OutputFormatOption.values.contains(outputFormat)
-        ? outputFormat
-        : OutputFormatOption.png;
-    final ratios = availableAspectRatiosFor(normalizedResolution);
+    final ratios = availableAspectRatios();
     final normalizedRatio =
         ratios.contains(aspectRatio) ? aspectRatio : ratios.first;
 
     return ImageGenerationOptions(
       aspectRatio: normalizedRatio,
-      resolution: normalizedResolution,
-      outputFormat: normalizedFormat,
     );
   }
 
-  static List<String> availableAspectRatiosFor(String resolution) {
-    if (resolution == ImageResolutionOption.fourK) {
-      return fourKAspectRatios;
-    }
-    return fullAspectRatios;
+  static List<String> availableAspectRatios() {
+    return commonAspectRatios;
   }
 
-  double get priceUsd => resolutionPrices[resolution] ?? 0.08;
+  double get priceUsd => unitPriceUsd;
 
-  String get summary =>
-      '${ImageResolutionOption.labelOf(resolution)} · $aspectRatio · ${OutputFormatOption.labelOf(outputFormat)}';
-}
-
-String mimeTypeForOutputFormat(String outputFormat) {
-  switch (outputFormat) {
-    case OutputFormatOption.jpeg:
-      return 'image/jpeg';
-    case OutputFormatOption.webp:
-      return 'image/webp';
-    case OutputFormatOption.png:
-    default:
-      return 'image/png';
-  }
-}
-
-String extensionForOutputFormat(String outputFormat) {
-  switch (outputFormat) {
-    case OutputFormatOption.jpeg:
-      return 'jpg';
-    case OutputFormatOption.webp:
-      return 'webp';
-    case OutputFormatOption.png:
-    default:
-      return 'png';
-  }
+  String get summary => aspectRatio;
 }
 
 class ChatMessage {
