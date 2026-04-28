@@ -5,14 +5,15 @@ cd /d "%~dp0"
 
 set "POWERSHELL_EXE=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
 set "OUTPUT_ROOT=release\READY_TO_SEND\Portable_ZIP"
-set "APP_VERSION=1.1.0"
+set "APP_VERSION=1.2.0"
+set "PACKAGE_PREFIX=Xii_Raw_Graph_Trial"
 set "DOWNLOADS_DIR=downloads"
 
 for /f "tokens=2 delims=:, " %%i in ('findstr /i "\"version\"" version.json') do (
   set "APP_VERSION=%%~i"
 )
 
-set "ZIP_OUTPUT=release\READY_TO_SEND\Xii_Raw_Graph_Portable_v%APP_VERSION%.zip"
+set "ZIP_OUTPUT=release\READY_TO_SEND\%PACKAGE_PREFIX%_v%APP_VERSION%.zip"
 
 echo ==========================================
 echo Building portable ZIP package
@@ -57,7 +58,7 @@ if errorlevel 1 (
 )
 
 if not exist "%DOWNLOADS_DIR%" mkdir "%DOWNLOADS_DIR%"
-copy /y "%ZIP_OUTPUT%" "%DOWNLOADS_DIR%\Xii_Raw_Graph_Portable_v%APP_VERSION%.zip" >nul
+copy /y "%ZIP_OUTPUT%" "%DOWNLOADS_DIR%\%PACKAGE_PREFIX%_v%APP_VERSION%.zip" >nul
 if errorlevel 1 (
   echo [ERROR] Failed to sync ZIP into repository downloads directory.
   exit /b 1
@@ -67,7 +68,7 @@ echo.
 echo Portable ZIP package created successfully:
 echo   Staging: %OUTPUT_ROOT%
 echo   Zip:    %ZIP_OUTPUT%
-echo   Repo:   %DOWNLOADS_DIR%\Xii_Raw_Graph_Portable_v%APP_VERSION%.zip
+echo   Repo:   %DOWNLOADS_DIR%\%PACKAGE_PREFIX%_v%APP_VERSION%.zip
 echo.
 echo Recommended next step:
 echo   Commit and push the updated ZIP, index.html, and version.json to GitHub.

@@ -179,8 +179,10 @@ Future<List<TestResult>> validateFunctionality(Directory libDir) async {
 
     results.add(TestResult(
         '图片URL提取功能存在',
-        content.contains('extractImageUrls') || content.contains('imageUrls'),
-        '图片URL提取功能未找到'));
+        content.contains('generatedImages') ||
+            content.contains('GeneratedImageAsset') ||
+            content.contains('imageUrls'),
+        '图片结果处理功能未找到'));
 
     results.add(TestResult(
         '环境变量配置存在',
@@ -198,18 +200,17 @@ Future<List<TestResult>> validateBuildConfiguration(String projectRoot) async {
   if (await pubspecFile.exists()) {
     final content = await pubspecFile.readAsString();
 
-    final releaseScript =
-        File(path.join(projectRoot, 'build_release.bat'));
+    final releaseScript = File(path.join(projectRoot, 'build_release.bat'));
     results.add(TestResult(
         'ZIP 发布脚本存在', await releaseScript.exists(), 'build_release.bat 未找到'));
 
-    final appIconFile = File(
-        path.join(projectRoot, 'windows', 'runner', 'resources', 'app_icon.ico'));
+    final appIconFile = File(path.join(
+        projectRoot, 'windows', 'runner', 'resources', 'app_icon.ico'));
     results.add(TestResult('应用图标资源存在', await appIconFile.exists(),
         'windows/runner/resources/app_icon.ico 未找到'));
 
-    results.add(TestResult(
-        '版本配置存在', content.contains('version:'), '应用版本配置未找到'));
+    results
+        .add(TestResult('版本配置存在', content.contains('version:'), '应用版本配置未找到'));
   }
 
   // 检查Windows构建配置

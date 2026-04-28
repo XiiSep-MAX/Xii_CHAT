@@ -1,17 +1,15 @@
-import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
 
 import 'chat_service.dart';
 import 'download_helper.dart';
+import 'env_config.dart';
 import 'models.dart';
 import 'update_service.dart';
-import 'env_config.dart';
 
 void main() {
-  // 加载环境配置
   EnvConfig.load();
-
   runApp(const AIChatApp());
 }
 
@@ -21,7 +19,7 @@ class AIChatApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AI Chat App',
+      title: 'Xii_Raw Graph Trial',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.deepPurple,
@@ -56,13 +54,16 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+  static const String _appVersion = '1.2.0';
+
   final List<ChatMessage> _messages = [];
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final OpenAIChatService _chatService = OpenAIChatService();
+
   ChatImageAttachment? _selectedImageAttachment;
+  ImageGenerationOptions _generationOptions = ImageGenerationOptions.defaults();
   bool _isSending = false;
-  static const String _appVersion = '1.1.0'; // 当前应用版本，需与 pubspec.yaml / version.json 保持一致
 
   @override
   void initState() {
@@ -81,7 +82,7 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }
     } catch (e) {
-      // 版本检查失败，继续使用应用
+      // 版本检查失败时继续使用应用
       print('版本检查异常: $e');
     }
   }
@@ -100,7 +101,7 @@ class _ChatScreenState extends State<ChatScreen> {
             const SizedBox(height: 8),
             const Text('更新内容:'),
             const SizedBox(height: 8),
-            Container(
+            ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 150),
               child: SingleChildScrollView(
                 child: Text(versionInfo.releaseNotes),
@@ -119,7 +120,6 @@ class _ChatScreenState extends State<ChatScreen> {
             children: [
               TextButton(
                 onPressed: () async {
-                  // 打开下载链接
                   Navigator.pop(context);
                   await _openDownloadUrl(versionInfo.downloadUrl);
                 },
@@ -143,7 +143,6 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _downloadAndInstallUpdate(VersionInfo versionInfo) async {
     final navigator = Navigator.of(context, rootNavigator: true);
 
-    // 显示下载进度
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -274,6 +273,38 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  void _updateResolution(String resolution) {
+    final previousRatio = _generationOptions.aspectRatio;
+    final nextOptions = _generationOptions.copyWith(
+      resolution: resolution,
+    );
+
+    setState(() {
+      _generationOptions = nextOptions;
+    });
+
+    if (previousRatio != nextOptions.aspectRatio &&
+        resolution == ImageResolutionOption.fourK) {
+      _showSnackBar('4K 仅支持部分宽高比，已自动切换为 ${nextOptions.aspectRatio}。');
+    }
+  }
+
+  void _updateAspectRatio(String aspectRatio) {
+    setState(() {
+      _generationOptions = _generationOptions.copyWith(
+        aspectRatio: aspectRatio,
+      );
+    });
+  }
+
+  void _updateOutputFormat(String outputFormat) {
+    setState(() {
+      _generationOptions = _generationOptions.copyWith(
+        outputFormat: outputFormat,
+      );
+    });
+  }
+
   void _showSnackBar(String message) {
     if (!mounted) return;
 
@@ -313,14 +344,18 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _handleSend() async {
     final text = _controller.text.trim();
     final imageAttachment = _selectedImageAttachment;
+    final requestOptions = _generationOptions.normalized();
     if (text.isEmpty && imageAttachment == null) return;
 
     setState(() {
-      _messages.add(ChatMessage(
-        text: text,
-        role: Role.user,
-        localImages: imageAttachment == null ? const [] : [imageAttachment],
-      ));
+      _messages.add(
+        ChatMessage(
+          text: text,
+          role: Role.user,
+          localImages: imageAttachment == null ? const [] : [imageAttachment],
+          generationOptions: requestOptions,
+        ),
+      );
       _isSending = true;
       _controller.clear();
       _selectedImageAttachment = null;
@@ -330,22 +365,29 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final response = await _chatService.sendMessage(
         prompt: text,
+        options: requestOptions,
         imageAttachment: imageAttachment,
       );
       setState(() {
-        _messages.add(ChatMessage(
-          text: response.text,
-          role: Role.bot,
-          imageUrls: response.imageUrls,
-        ));
+        _messages.add(
+          ChatMessage(
+            text: response.text,
+            role: Role.bot,
+            generatedImages: response.generatedImages,
+            generationOptions: requestOptions,
+          ),
+        );
       });
       _scrollToBottom();
     } catch (error) {
       setState(() {
-        _messages.add(ChatMessage(
-          text: '网络请求失败：${error.toString()}',
-          role: Role.bot,
-        ));
+        _messages.add(
+          ChatMessage(
+            text: '生成失败：${error.toString()}',
+            role: Role.bot,
+            generationOptions: requestOptions,
+          ),
+        );
       });
       _scrollToBottom();
     } finally {
@@ -357,6 +399,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentPrice =
+        '\$${_generationOptions.priceUsd.toStringAsFixed(2)}/张';
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -377,11 +422,40 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            const Text(
-              'Xii_Raw Graph',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 18,
+            Expanded(
+              child: Row(
+                children: [
+                  const Flexible(
+                    child: Text(
+                      'Xii_Raw Graph',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primaryContainer
+                          .withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '试用版 v$_appVersion',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -440,7 +514,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      '欢迎使用 Xii_Raw Graph ',
+                      '欢迎使用 Xii_Raw Graph 试用版',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
@@ -449,7 +523,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '输入您的问题，我会尽力为您解答。仅支持图片生成！！！',
+                      '支持尺寸比例、1K/2K/4K 分辨率和 PNG/JPEG/WEBP 输出格式选择。当前仅支持图片生成。',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
@@ -491,7 +565,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      'AI 正在思考中...',
+                      'AI 正在生成图片...',
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.primary,
                         fontWeight: FontWeight.w500,
@@ -532,6 +606,16 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  _GenerationOptionsPanel(
+                    options: _generationOptions,
+                    currentPrice: currentPrice,
+                    onAspectRatioChanged:
+                        _isSending ? null : _updateAspectRatio,
+                    onOutputFormatChanged:
+                        _isSending ? null : _updateOutputFormat,
+                    onResolutionChanged: _isSending ? null : _updateResolution,
+                  ),
+                  const SizedBox(height: 12),
                   if (_selectedImageAttachment != null) ...[
                     _ComposerImagePreview(
                       attachment: _selectedImageAttachment!,
@@ -599,8 +683,8 @@ class _ChatScreenState extends State<ChatScreen> {
                             maxLines: null,
                             decoration: InputDecoration(
                               hintText: _selectedImageAttachment == null
-                                  ? '输入您的问题...'
-                                  : '输入描述，和图片一起发送...',
+                                  ? '输入图片描述，例如：电影感海边日落、暖色调、超细节'
+                                  : '输入描述，结合参考图一起生成...',
                               hintStyle: TextStyle(
                                 color: Theme.of(context)
                                     .colorScheme
@@ -613,7 +697,9 @@ class _ChatScreenState extends State<ChatScreen> {
                               ),
                               border: InputBorder.none,
                               contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 12),
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
                             ),
                           ),
                         ),
@@ -629,7 +715,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 ? [Colors.grey.shade400, Colors.grey.shade500]
                                 : [
                                     Colors.blue.shade500,
-                                    Colors.purple.shade500
+                                    Colors.purple.shade500,
                                   ],
                           ),
                           borderRadius: BorderRadius.circular(24),
@@ -699,9 +785,9 @@ class AnimatedMessageBubble extends StatefulWidget {
 
 class _AnimatedMessageBubbleState extends State<AnimatedMessageBubble>
     with TickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _opacityAnimation;
-  late Animation<Offset> _slideAnimation;
+  late final AnimationController _animationController;
+  late final Animation<double> _opacityAnimation;
+  late final Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
@@ -714,18 +800,22 @@ class _AnimatedMessageBubbleState extends State<AnimatedMessageBubble>
     _opacityAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    ));
+    ).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOut,
+      ),
+    );
 
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.1),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    ));
+    ).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOut,
+      ),
+    );
 
     if (widget.isNew) {
       _animationController.forward();
@@ -807,6 +897,14 @@ class ChatBubble extends StatelessWidget {
             child: Column(
               crossAxisAlignment: alignment,
               children: [
+                if (message.generationOptions != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _MessageOptionSummary(
+                      options: message.generationOptions!,
+                      alignEnd: isUser,
+                    ),
+                  ),
                 if (message.text.isNotEmpty)
                   Container(
                     decoration: BoxDecoration(
@@ -830,7 +928,9 @@ class ChatBubble extends StatelessWidget {
                       ],
                     ),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     child: Text(
                       message.text,
                       style: TextStyle(
@@ -850,59 +950,65 @@ class ChatBubble extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                 ],
-                for (final imageUrl in message.imageUrls) ...[
+                for (final image in message.generatedImages) ...[
                   _ChatImageFrame(
-                    child: CachedNetworkImage(
-                      imageUrl: imageUrl,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(
-                        width: double.infinity,
-                        height: 240,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        alignment: Alignment.center,
-                        child: const SizedBox(
-                          width: 32,
-                          height: 32,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.grey),
-                          ),
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => Container(
-                        width: double.infinity,
-                        height: 240,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        alignment: Alignment.center,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.broken_image,
-                              color: Colors.grey.shade500,
-                              size: 48,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '无法加载图片',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 14,
+                    child: image.hasBytes
+                        ? Image.memory(
+                            image.bytes!,
+                            fit: BoxFit.cover,
+                          )
+                        : CachedNetworkImage(
+                            imageUrl: image.imageUrl!,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              width: double.infinity,
+                              height: 240,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              alignment: Alignment.center,
+                              child: const SizedBox(
+                                width: 32,
+                                height: 32,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.grey,
+                                  ),
+                                ),
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                      fadeInDuration: const Duration(milliseconds: 300),
-                      useOldImageOnUrlChange: true,
-                    ),
+                            errorWidget: (context, url, error) => Container(
+                              width: double.infinity,
+                              height: 240,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              alignment: Alignment.center,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.broken_image,
+                                    color: Colors.grey.shade500,
+                                    size: 48,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '无法加载图片',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            fadeInDuration: const Duration(milliseconds: 300),
+                            useOldImageOnUrlChange: true,
+                          ),
                   ),
                   const SizedBox(height: 8),
                   Align(
@@ -922,7 +1028,7 @@ class ChatBubble extends StatelessWidget {
                       ),
                       child: TextButton.icon(
                         onPressed: () async => downloadImagePlatform(
-                          imageUrl,
+                          image,
                           context: context,
                         ),
                         icon: Icon(
@@ -939,7 +1045,9 @@ class ChatBubble extends StatelessWidget {
                         ),
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
@@ -953,6 +1061,304 @@ class ChatBubble extends StatelessWidget {
           ),
           if (isUser) const SizedBox(width: 12),
           if (isUser) avatar,
+        ],
+      ),
+    );
+  }
+}
+
+class _GenerationOptionsPanel extends StatelessWidget {
+  final ImageGenerationOptions options;
+  final String currentPrice;
+  final ValueChanged<String>? onResolutionChanged;
+  final ValueChanged<String>? onAspectRatioChanged;
+  final ValueChanged<String>? onOutputFormatChanged;
+
+  const _GenerationOptionsPanel({
+    required this.options,
+    required this.currentPrice,
+    this.onResolutionChanged,
+    this.onAspectRatioChanged,
+    this.onOutputFormatChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final availableRatios =
+        ImageGenerationOptions.availableAspectRatiosFor(options.resolution);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.12),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.tune_rounded,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '本次生成参数',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primaryContainer
+                      .withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '当前 $currentPrice',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 560;
+              final fieldWidth = compact ? constraints.maxWidth : 160.0;
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: fieldWidth,
+                    child: _OptionDropdown(
+                      label: '尺寸比例',
+                      value: options.aspectRatio,
+                      items: availableRatios,
+                      onChanged: onAspectRatioChanged,
+                    ),
+                  ),
+                  SizedBox(
+                    width: fieldWidth,
+                    child: _OptionDropdown(
+                      label: '分辨率',
+                      value: options.resolution,
+                      items: ImageResolutionOption.values,
+                      labelBuilder: ImageResolutionOption.labelOf,
+                      onChanged: onResolutionChanged,
+                    ),
+                  ),
+                  SizedBox(
+                    width: fieldWidth,
+                    child: _OptionDropdown(
+                      label: '输出格式',
+                      value: options.outputFormat,
+                      items: OutputFormatOption.values,
+                      labelBuilder: OutputFormatOption.labelOf,
+                      onChanged: onOutputFormatChanged,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: ImageResolutionOption.values.map((resolution) {
+              final selected = options.resolution == resolution;
+              final price =
+                  ImageGenerationOptions.resolutionPrices[resolution]!;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? Theme.of(context)
+                          .colorScheme
+                          .primaryContainer
+                          .withOpacity(0.9)
+                      : Theme.of(context).colorScheme.surface.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: selected
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context)
+                            .colorScheme
+                            .outline
+                            .withOpacity(0.2),
+                  ),
+                ),
+                child: Text(
+                  '${ImageResolutionOption.labelOf(resolution)}: \$${price.toStringAsFixed(2)}/张',
+                  style: TextStyle(
+                    color: selected
+                        ? Theme.of(context).colorScheme.onPrimaryContainer
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            options.resolution == ImageResolutionOption.fourK
+                ? '4K 仅支持 16:9、9:16、2:1、1:2、21:9、9:21。'
+                : '1K / 2K 额外开放 1:1、2:3、3:2、4:3、3:4、5:4、4:5 等更多比例。',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 12,
+              height: 1.45,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OptionDropdown extends StatelessWidget {
+  final String label;
+  final String value;
+  final List<String> items;
+  final ValueChanged<String>? onChanged;
+  final String Function(String value)? labelBuilder;
+
+  const _OptionDropdown({
+    required this.label,
+    required this.value,
+    required this.items,
+    this.onChanged,
+    this.labelBuilder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      value: items.contains(value) ? value : null,
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: Theme.of(context).colorScheme.surface.withOpacity(0.92),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(
+            color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          ),
+        ),
+      ),
+      items: items
+          .map(
+            (item) => DropdownMenuItem<String>(
+              value: item,
+              child: Text(labelBuilder?.call(item) ?? item),
+            ),
+          )
+          .toList(),
+      onChanged: onChanged == null
+          ? null
+          : (value) {
+              if (value != null) {
+                onChanged!(value);
+              }
+            },
+    );
+  }
+}
+
+class _MessageOptionSummary extends StatelessWidget {
+  final ImageGenerationOptions options;
+  final bool alignEnd;
+
+  const _MessageOptionSummary({
+    required this.options,
+    required this.alignEnd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      alignment: alignEnd ? WrapAlignment.end : WrapAlignment.start,
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _SummaryChip(
+          icon: Icons.hd_rounded,
+          label: ImageResolutionOption.labelOf(options.resolution),
+        ),
+        _SummaryChip(
+          icon: Icons.crop_rounded,
+          label: options.aspectRatio,
+        ),
+        _SummaryChip(
+          icon: Icons.insert_photo_outlined,
+          label: OutputFormatOption.labelOf(options.outputFormat),
+        ),
+      ],
+    );
+  }
+}
+
+class _SummaryChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _SummaryChip({
+    required this.icon,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.15),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 14,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -998,7 +1404,7 @@ class _ComposerImagePreview extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '已选择图片',
+                  '已选择参考图',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.w600,

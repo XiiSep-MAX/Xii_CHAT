@@ -16,7 +16,8 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   group('AI Chat App Integration Tests', () {
-    testWidgets('App launches and shows main interface', (WidgetTester tester) async {
+    testWidgets('App launches and shows main interface',
+        (WidgetTester tester) async {
       // Build our app and trigger a frame.
       await tester.pumpWidget(const AIChatApp());
 
@@ -29,6 +30,9 @@ void main() {
 
       // Verify that the input field is present
       expect(find.byType(TextField), findsOneWidget);
+      expect(find.text('尺寸比例'), findsOneWidget);
+      expect(find.text('分辨率'), findsOneWidget);
+      expect(find.text('输出格式'), findsOneWidget);
 
       // Verify that the send button is present
       expect(find.byIcon(Icons.send_rounded), findsOneWidget);
@@ -49,7 +53,7 @@ void main() {
       expect(find.text('Hello AI!'), findsOneWidget);
 
       // Test clear messages button (if exists)
-      final clearButton = find.byIcon(Icons.delete_outline);
+      final clearButton = find.byIcon(Icons.delete_sweep_rounded);
       if (clearButton.evaluate().isNotEmpty) {
         await tester.tap(clearButton);
         await tester.pump();
@@ -59,7 +63,8 @@ void main() {
       print('✅ UI interaction test passed');
     });
 
-    testWidgets('Theme and styling are applied correctly', (WidgetTester tester) async {
+    testWidgets('Theme and styling are applied correctly',
+        (WidgetTester tester) async {
       await tester.pumpWidget(const AIChatApp());
       await tester.pumpAndSettle();
 

@@ -1,6 +1,6 @@
 {
-  "version": "1.1.0",
-  "downloadUrl": "https://raw.githubusercontent.com/XiiSep-MAX/Xii_CHAT/main/downloads/Xii_Raw_Graph_Portable_v1.1.0.zip",
-  "releaseNotes": "✨ 新版本特性\n\n新增功能:\n- 发布方式切换为免安装 ZIP 便携版\n- 提供 GitHub Pages 下载页\n- 解压后可直接看到 EXE 主程序\n- 支持图片上传与下载反馈\n\n修复:\n- 修复图片下载无提示问题\n- 提升更新下载体验",
+  "version": "1.2.0",
+  "downloadUrl": "https://raw.githubusercontent.com/XiiSep-MAX/Xii_CHAT/main/downloads/Xii_Raw_Graph_Trial_v1.2.0.zip",
+  "releaseNotes": "✨ 试用版更新\n\n新增功能:\n- 切换到岚风AI图片接口 https://lanfengai.cn\n- 新增尺寸比例、分辨率、输出格式选择\n- 新增 1K / 2K / 4K 价格提示\n- 4K 限制为 16:9、9:16、2:1、1:2、21:9、9:21\n- 1K / 2K 额外开放 1:1、2:3、3:2、4:3、3:4、5:4、4:5 等比例\n\n优化:\n- 兼容接口返回 URL 或 base64 图片结果\n- 生成图片支持直接下载保存",
   "isForced": false
 }

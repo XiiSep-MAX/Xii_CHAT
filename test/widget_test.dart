@@ -12,6 +12,7 @@ void main() {
   testWidgets('AI Chat App smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const AIChatApp());
+    await tester.pump();
 
     // Verify that our app shows the chat screen
     expect(find.text('Xii_Raw Graph'), findsOneWidget);
@@ -19,6 +20,9 @@ void main() {
 
     // Verify that the input field is present
     expect(find.byType(TextField), findsOneWidget);
+    expect(find.text('尺寸比例'), findsOneWidget);
+    expect(find.text('分辨率'), findsOneWidget);
+    expect(find.text('输出格式'), findsOneWidget);
 
     // Verify that the image picker button is present
     expect(find.byIcon(Icons.add_photo_alternate_outlined), findsOneWidget);

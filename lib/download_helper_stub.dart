@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
-Future<void> downloadImagePlatform(String url, {BuildContext? context}) async {
+import 'models.dart';
+
+Future<void> downloadImagePlatform(
+  GeneratedImageAsset image, {
+  BuildContext? context,
+}) async {
   if (context == null) return;
 
   final messenger = ScaffoldMessenger.of(context);
