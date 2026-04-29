@@ -1,6 +1,6 @@
 {
-  "version": "1.2.4",
-  "downloadUrl": "https://raw.githubusercontent.com/XiiSep-MAX/Xii_CHAT/main/downloads/Xii_Raw_Graph_Trial_v1.2.4.zip",
-  "releaseNotes": "🛠 自动更新修复版 1.2.4\n\n本次重点修复自动更新在关闭主程序后可能无响应的问题:\n- 增加后台更新器启动确认\n- 主更新器未接管时自动回退到脚本更新方案\n- 降低主程序关闭后静默失败的概率\n\n建议先手动安装这一版，再继续验证下一版自动更新。",
+  "version": "1.2.5",
+  "downloadUrl": "https://raw.githubusercontent.com/XiiSep-MAX/Xii_CHAT/main/downloads/Xii_Raw_Graph_Trial_v1.2.5.zip",
+  "releaseNotes": "🧪 自动更新验证版 1.2.5\n\n本次用于验证 1.2.4 修复后的自动更新链路:\n- 验证后台更新器交接是否成功\n- 验证主程序关闭后能否继续安装\n- 验证更新完成后是否会自动重新打开应用\n\n如果你已手动安装 1.2.4，现在可以直接用应用内更新测试到这一版。",
   "isForced": false
 }
