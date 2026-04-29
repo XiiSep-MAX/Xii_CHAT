@@ -23,6 +23,7 @@ Future<void> main(List<String> args) async {
   final appDir = options['app-dir'];
   final zipPath = options['zip-path'];
   final targetExe = options['target-exe'];
+  final readyFilePath = options['ready-file'];
   final sourcePid = int.tryParse(options['source-pid'] ?? '') ?? 0;
   final preserve = (options['preserve'] ?? '.env')
       .split(';')
@@ -43,6 +44,8 @@ Future<void> main(List<String> args) async {
   await extractDir.create(recursive: true);
 
   try {
+    await _signalReady(readyFilePath);
+
     if (sourcePid > 0) {
       await _waitForProcessExit(sourcePid);
     }
@@ -98,6 +101,16 @@ Map<String, String> _parseArgs(List<String> args) {
     options[key] = value;
   }
   return options;
+}
+
+Future<void> _signalReady(String? readyFilePath) async {
+  if (readyFilePath == null || readyFilePath.trim().isEmpty) {
+    return;
+  }
+
+  final readyFile = File(readyFilePath);
+  await readyFile.parent.create(recursive: true);
+  await readyFile.writeAsString('ready');
 }
 
 Future<void> _waitForProcessExit(int sourcePid) async {

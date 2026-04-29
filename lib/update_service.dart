@@ -16,6 +16,7 @@ class UpdateService {
   static const Duration _packageConnectTimeout = Duration(seconds: 20);
   static const Duration _packageReadTimeout = Duration(seconds: 20);
   static const Duration _packageAttemptTimeout = Duration(minutes: 8);
+  static const Duration _updaterReadyTimeout = Duration(seconds: 5);
   static const int _maxDownloadAttempts = 3;
 
   static String get _powerShellExecutable => path.join(
@@ -490,48 +491,50 @@ class UpdateService {
     final appExecutable = File(Platform.resolvedExecutable);
     final appDir = appExecutable.parent.path;
     final targetExe = path.basename(appExecutable.path);
+    final handoffDir = await Directory.systemTemp.createTemp(
+      'xii_update_handoff_',
+    );
+    final readyFile = File(path.join(handoffDir.path, 'ready.flag'));
     final updaterArguments = [
       '--app-dir=$appDir',
       '--zip-path=${localPackage.path}',
       '--target-exe=$targetExe',
       '--source-pid=$pid',
       '--preserve=${_preservedInstallFiles.join(';')}',
+      '--ready-file=${readyFile.path}',
     ];
 
-    final bundledUpdater = File(path.join(appDir, _bundledUpdaterFileName));
-    if (await bundledUpdater.exists()) {
-      final tempUpdater = await _copyUpdaterToTemp(bundledUpdater);
-      await _startDetachedProcessHidden(
-        tempUpdater.path,
-        updaterArguments,
-      );
-      return;
-    }
+    try {
+      final bundledUpdater = File(path.join(appDir, _bundledUpdaterFileName));
+      if (await bundledUpdater.exists()) {
+        try {
+          final tempUpdater = await _copyUpdaterToTemp(bundledUpdater);
+          final launched = await _startBundledUpdaterAndWaitForReady(
+            updaterPath: tempUpdater.path,
+            arguments: updaterArguments,
+            readyFile: readyFile,
+          );
+          if (launched) {
+            return;
+          }
+          stderr.writeln('捆绑更新器未在超时内确认启动，回退到脚本更新器。');
+        } catch (error) {
+          stderr.writeln('启动捆绑更新器失败，回退到脚本更新器: $error');
+        }
+      }
 
-    final fallbackScript = await _createFallbackUpdaterScript();
-    await Process.start(
-      _powerShellExecutable,
-      [
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-WindowStyle',
-        'Hidden',
-        '-File',
-        fallbackScript.path,
-        '-AppDir',
-        appDir,
-        '-ZipPath',
-        localPackage.path,
-        '-TargetExe',
-        targetExe,
-        '-SourcePid',
-        '$pid',
-        '-Preserve',
-        _preservedInstallFiles.join(';'),
-      ],
-      mode: ProcessStartMode.detached,
-    );
+      final fallbackScript = await _createFallbackUpdaterScript();
+      await _startFallbackUpdaterScriptAndWaitForReady(
+        scriptPath: fallbackScript.path,
+        appDir: appDir,
+        zipPath: localPackage.path,
+        targetExe: targetExe,
+        readyFile: readyFile,
+      );
+    } finally {
+      await _deleteIfExists(readyFile);
+      await _deleteDirectoryIfExists(handoffDir);
+    }
   }
 
   static Future<File> _copyUpdaterToTemp(File bundledUpdater) async {
@@ -549,22 +552,26 @@ class UpdateService {
     return scriptFile;
   }
 
-  static Future<void> _startDetachedProcessHidden(
-    String filePath,
-    List<String> arguments,
-  ) async {
-    final argumentList = arguments.map(_toPowerShellQuotedString).join(', ');
-    final command = StringBuffer()
-      ..write('Start-Process -FilePath ')
-      ..write(_toPowerShellQuotedString(filePath));
-    if (arguments.isNotEmpty) {
-      command
-        ..write(' -ArgumentList @(')
-        ..write(argumentList)
-        ..write(')');
-    }
-    command.write(' -WindowStyle Hidden');
+  static Future<bool> _startBundledUpdaterAndWaitForReady({
+    required String updaterPath,
+    required List<String> arguments,
+    required File readyFile,
+  }) async {
+    await Process.start(
+      updaterPath,
+      arguments,
+      mode: ProcessStartMode.detached,
+    );
+    return _waitForReadyFile(readyFile);
+  }
 
+  static Future<void> _startFallbackUpdaterScriptAndWaitForReady({
+    required String scriptPath,
+    required String appDir,
+    required String zipPath,
+    required String targetExe,
+    required File readyFile,
+  }) async {
     await Process.start(
       _powerShellExecutable,
       [
@@ -573,15 +580,46 @@ class UpdateService {
         'Bypass',
         '-WindowStyle',
         'Hidden',
-        '-Command',
-        command.toString(),
+        '-File',
+        scriptPath,
+        '-AppDir',
+        appDir,
+        '-ZipPath',
+        zipPath,
+        '-TargetExe',
+        targetExe,
+        '-SourcePid',
+        '$pid',
+        '-Preserve',
+        _preservedInstallFiles.join(';'),
+        '-ReadyFile',
+        readyFile.path,
       ],
       mode: ProcessStartMode.detached,
     );
+
+    final launched = await _waitForReadyFile(readyFile);
+    if (!launched) {
+      throw Exception('自动更新器启动超时，请稍后重试。');
+    }
   }
 
-  static String _toPowerShellQuotedString(String value) {
-    return "'${value.replaceAll("'", "''")}'";
+  static Future<bool> _waitForReadyFile(File readyFile) async {
+    final deadline = DateTime.now().add(_updaterReadyTimeout);
+    while (DateTime.now().isBefore(deadline)) {
+      if (await readyFile.exists()) {
+        return true;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+    }
+
+    return readyFile.exists();
+  }
+
+  static Future<void> _deleteDirectoryIfExists(Directory directory) async {
+    if (await directory.exists()) {
+      await directory.delete(recursive: true);
+    }
   }
 
   static String get _fallbackUpdaterScript => r'''
@@ -590,7 +628,8 @@ param(
   [Parameter(Mandatory = $true)][string]$ZipPath,
   [Parameter(Mandatory = $true)][string]$TargetExe,
   [Parameter(Mandatory = $true)][int]$SourcePid,
-  [string]$Preserve = '.env'
+  [string]$Preserve = '.env',
+  [string]$ReadyFile = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -616,10 +655,26 @@ function Get-SourceRoot([string]$ExtractDir) {
   return $ExtractDir
 }
 
+function Signal-Ready([string]$Path) {
+  if (-not $Path) {
+    return
+  }
+
+  try {
+    $parent = Split-Path -Parent $Path
+    if ($parent) {
+      New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+    Set-Content -LiteralPath $Path -Value 'ready' -Encoding UTF8 -Force
+  } catch {
+  }
+}
+
 try {
   $workDir = Join-Path $env:TEMP ('Xii_Raw_Graph_Update_' + [Guid]::NewGuid().ToString('N'))
   $extractDir = Join-Path $workDir 'extract'
   New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
+  Signal-Ready $ReadyFile
 
   if ($SourcePid -gt 0) {
     Wait-Process -Id $SourcePid -Timeout 120 -ErrorAction SilentlyContinue
