@@ -26,6 +26,20 @@ if errorlevel 1 (
   exit /b 1
 )
 
+echo 2. Building updater helper...
+if not exist "build\portable_updater" mkdir "build\portable_updater"
+call dart compile exe tool\portable_updater.dart -o build\portable_updater\xii_updater.exe
+if errorlevel 1 (
+  echo [ERROR] Updater helper build failed.
+  exit /b 1
+)
+
+copy /y "build\portable_updater\xii_updater.exe" "build\windows\x64\runner\Release\xii_updater.exe" >nul
+if errorlevel 1 (
+  echo [ERROR] Failed to copy updater helper into release output.
+  exit /b 1
+)
+
 if exist "build\windows\x64\runner\Release\.env" (
   echo [INFO] Removing stale .env from build output...
   del /f /q "build\windows\x64\runner\Release\.env"
@@ -34,7 +48,7 @@ if exist "build\windows\x64\runner\Release\.env" (
 if exist "%OUTPUT_ROOT%" rmdir /s /q "%OUTPUT_ROOT%"
 mkdir "%OUTPUT_ROOT%"
 
-echo 2. Copying portable runtime files...
+echo 3. Copying portable runtime files...
 xcopy /e /i /y "build\windows\x64\runner\Release\*" "%OUTPUT_ROOT%\" >nul
 if errorlevel 1 (
   echo [ERROR] Failed to copy the Windows release files.
@@ -50,7 +64,7 @@ if exist ".env.example" (
   copy /y ".env.example" "%OUTPUT_ROOT%\.env.example" >nul
 )
 
-echo 3. Creating ZIP archive...
+echo 4. Creating ZIP archive...
 "%POWERSHELL_EXE%" -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path '%~dp0%ZIP_OUTPUT%') { Remove-Item '%~dp0%ZIP_OUTPUT%' -Force }; Compress-Archive -Path '%~dp0%OUTPUT_ROOT%\*' -DestinationPath '%~dp0%ZIP_OUTPUT%'"
 if errorlevel 1 (
   echo [ERROR] Failed to create the ZIP archive.

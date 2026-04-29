@@ -11,10 +11,20 @@ class UpdateService {
   // 版本检查元数据地址
   static const String _versionCheckUrl =
       'https://raw.githubusercontent.com/XiiSep-MAX/Xii_CHAT/main/version.json';
+  static const String _bundledUpdaterFileName = 'xii_updater.exe';
+  static const List<String> _preservedInstallFiles = ['.env'];
   static const Duration _packageConnectTimeout = Duration(seconds: 20);
   static const Duration _packageReadTimeout = Duration(seconds: 20);
   static const Duration _packageAttemptTimeout = Duration(minutes: 8);
   static const int _maxDownloadAttempts = 3;
+
+  static String get _powerShellExecutable => path.join(
+        Platform.environment['SystemRoot'] ?? r'C:\Windows',
+        'System32',
+        'WindowsPowerShell',
+        'v1.0',
+        'powershell.exe',
+      );
 
   /// 获取远程版本信息
   static Future<VersionInfo?> checkForUpdates({
@@ -66,14 +76,39 @@ class UpdateService {
             packageType: packageType,
             onProgress: onProgress,
           );
+          if (packageType == _UpdatePackageType.zipPackage) {
+            try {
+              onProgress?.call(
+                UpdateDownloadProgress(
+                  phase: UpdateDownloadPhase.preparingInstall,
+                  message: '下载完成，正在准备自动安装...',
+                  downloadedBytes: await localPackage.length(),
+                  totalBytes: await localPackage.length(),
+                  attempt: 1,
+                  maxAttempts: _maxDownloadAttempts,
+                ),
+              );
+
+              await _launchAutomaticZipUpdate(localPackage: localPackage);
+              return const UpdateInstallResult.autoRestart(
+                '更新包已下载完成，应用将自动关闭并安装新版本。',
+              );
+            } catch (error) {
+              stderr.writeln('自动安装启动失败: $error');
+              final opened = await _openFolderAndSelectFile(localPackage.path);
+              final suffix = opened ? '，并已为你打开所在目录。' : '。';
+              return UpdateInstallResult.success(
+                '更新包已下载到：${localPackage.path}$suffix\n\n'
+                '自动安装未能启动，请先关闭当前版本，再手动解压覆盖。',
+              );
+            }
+          }
+
           final opened = await _openFolderAndSelectFile(localPackage.path);
           final suffix = opened ? '，并已为你打开所在目录。' : '。';
-          final actionHint = packageType == _UpdatePackageType.zipPackage
-              ? '请先解压 ZIP，再用新文件替换旧版本。'
-              : '请关闭旧版本后运行新文件。';
-
           return UpdateInstallResult.success(
-            '便携版更新包已下载到：${localPackage.path}$suffix\n\n$actionHint',
+            '更新包已下载到：${localPackage.path}$suffix\n\n'
+            '请关闭旧版本后运行新文件。',
           );
         } on TimeoutException catch (error) {
           stderr.writeln('自动下载超时: $error');
@@ -448,6 +483,195 @@ class UpdateService {
 
     return candidate;
   }
+
+  static Future<void> _launchAutomaticZipUpdate({
+    required File localPackage,
+  }) async {
+    final appExecutable = File(Platform.resolvedExecutable);
+    final appDir = appExecutable.parent.path;
+    final targetExe = path.basename(appExecutable.path);
+    final updaterArguments = [
+      '--app-dir=$appDir',
+      '--zip-path=${localPackage.path}',
+      '--target-exe=$targetExe',
+      '--source-pid=$pid',
+      '--preserve=${_preservedInstallFiles.join(';')}',
+    ];
+
+    final bundledUpdater = File(path.join(appDir, _bundledUpdaterFileName));
+    if (await bundledUpdater.exists()) {
+      final tempUpdater = await _copyUpdaterToTemp(bundledUpdater);
+      await _startDetachedProcessHidden(
+        tempUpdater.path,
+        updaterArguments,
+      );
+      return;
+    }
+
+    final fallbackScript = await _createFallbackUpdaterScript();
+    await Process.start(
+      _powerShellExecutable,
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-WindowStyle',
+        'Hidden',
+        '-File',
+        fallbackScript.path,
+        '-AppDir',
+        appDir,
+        '-ZipPath',
+        localPackage.path,
+        '-TargetExe',
+        targetExe,
+        '-SourcePid',
+        '$pid',
+        '-Preserve',
+        _preservedInstallFiles.join(';'),
+      ],
+      mode: ProcessStartMode.detached,
+    );
+  }
+
+  static Future<File> _copyUpdaterToTemp(File bundledUpdater) async {
+    final tempDir = await Directory.systemTemp.createTemp('xii_updater_');
+    final copiedUpdater =
+        File(path.join(tempDir.path, _bundledUpdaterFileName));
+    await bundledUpdater.copy(copiedUpdater.path);
+    return copiedUpdater;
+  }
+
+  static Future<File> _createFallbackUpdaterScript() async {
+    final tempDir = await Directory.systemTemp.createTemp('xii_update_script_');
+    final scriptFile = File(path.join(tempDir.path, 'apply_update.ps1'));
+    await scriptFile.writeAsString(_fallbackUpdaterScript);
+    return scriptFile;
+  }
+
+  static Future<void> _startDetachedProcessHidden(
+    String filePath,
+    List<String> arguments,
+  ) async {
+    final argumentList = arguments.map(_toPowerShellQuotedString).join(', ');
+    final command = StringBuffer()
+      ..write('Start-Process -FilePath ')
+      ..write(_toPowerShellQuotedString(filePath));
+    if (arguments.isNotEmpty) {
+      command
+        ..write(' -ArgumentList @(')
+        ..write(argumentList)
+        ..write(')');
+    }
+    command.write(' -WindowStyle Hidden');
+
+    await Process.start(
+      _powerShellExecutable,
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-WindowStyle',
+        'Hidden',
+        '-Command',
+        command.toString(),
+      ],
+      mode: ProcessStartMode.detached,
+    );
+  }
+
+  static String _toPowerShellQuotedString(String value) {
+    return "'${value.replaceAll("'", "''")}'";
+  }
+
+  static String get _fallbackUpdaterScript => r'''
+param(
+  [Parameter(Mandatory = $true)][string]$AppDir,
+  [Parameter(Mandatory = $true)][string]$ZipPath,
+  [Parameter(Mandatory = $true)][string]$TargetExe,
+  [Parameter(Mandatory = $true)][int]$SourcePid,
+  [string]$Preserve = '.env'
+)
+
+$ErrorActionPreference = 'Stop'
+
+function Show-ErrorDialog([string]$Message) {
+  try {
+    Add-Type -AssemblyName PresentationFramework
+    [System.Windows.MessageBox]::Show(
+      $Message,
+      'Xii_Raw Graph 自动更新失败',
+      [System.Windows.MessageBoxButton]::OK,
+      [System.Windows.MessageBoxImage]::Error
+    ) | Out-Null
+  } catch {
+  }
+}
+
+function Get-SourceRoot([string]$ExtractDir) {
+  $entries = Get-ChildItem -LiteralPath $ExtractDir -Force
+  if ($entries.Count -eq 1 -and $entries[0].PSIsContainer) {
+    return $entries[0].FullName
+  }
+  return $ExtractDir
+}
+
+try {
+  $workDir = Join-Path $env:TEMP ('Xii_Raw_Graph_Update_' + [Guid]::NewGuid().ToString('N'))
+  $extractDir = Join-Path $workDir 'extract'
+  New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
+
+  if ($SourcePid -gt 0) {
+    Wait-Process -Id $SourcePid -Timeout 120 -ErrorAction SilentlyContinue
+  }
+
+  Expand-Archive -LiteralPath $ZipPath -DestinationPath $extractDir -Force
+  $sourceRoot = Get-SourceRoot $extractDir
+
+  $robocopyArgs = @(
+    $sourceRoot,
+    $AppDir,
+    '/MIR',
+    '/R:2',
+    '/W:1',
+    '/NFL',
+    '/NDL',
+    '/NJH',
+    '/NJS',
+    '/NP'
+  )
+
+  if ($Preserve) {
+    $preservedFiles = $Preserve.Split(';') | Where-Object { $_ }
+    if ($preservedFiles.Count -gt 0) {
+      $robocopyArgs += '/XF'
+      $robocopyArgs += $preservedFiles
+    }
+  }
+
+  & robocopy @robocopyArgs | Out-Null
+  if ($LASTEXITCODE -gt 7) {
+    throw "覆盖安装目录失败，Robocopy 退出码: $LASTEXITCODE"
+  }
+
+  $targetPath = Join-Path $AppDir $TargetExe
+  if (-not (Test-Path -LiteralPath $targetPath)) {
+    throw "未找到更新后的启动文件: $targetPath"
+  }
+
+  Start-Process -FilePath $targetPath -WorkingDirectory $AppDir
+  Remove-Item -LiteralPath $workDir -Recurse -Force -ErrorAction SilentlyContinue
+} catch {
+  Show-ErrorDialog("自动更新失败：$($_.Exception.Message)`n`n更新包保留在：$ZipPath")
+  try {
+    $targetPath = Join-Path $AppDir $TargetExe
+    if (Test-Path -LiteralPath $targetPath) {
+      Start-Process -FilePath $targetPath -WorkingDirectory $AppDir
+    }
+  } catch {
+  }
+}
+''';
 }
 
 enum _UpdatePackageType {
@@ -461,6 +685,8 @@ enum UpdateDownloadPhase {
   downloading,
   retrying,
   finalizing,
+  preparingInstall,
+  restarting,
   fallback,
 }
 
@@ -511,10 +737,20 @@ class UpdateDownloadProgress {
 class UpdateInstallResult {
   final bool success;
   final String message;
+  final bool shouldExitApplication;
 
-  const UpdateInstallResult.success(this.message) : success = true;
+  const UpdateInstallResult.success(
+    this.message, {
+    this.shouldExitApplication = false,
+  }) : success = true;
 
-  const UpdateInstallResult.failure(this.message) : success = false;
+  const UpdateInstallResult.autoRestart(this.message)
+      : success = true,
+        shouldExitApplication = true;
+
+  const UpdateInstallResult.failure(this.message)
+      : success = false,
+        shouldExitApplication = false;
 }
 
 /// 版本信息数据模型

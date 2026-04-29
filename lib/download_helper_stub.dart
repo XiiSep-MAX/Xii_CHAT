@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import 'image_download_progress.dart';
 import 'models.dart';
 
 Future<void> downloadImagePlatform(
   GeneratedImageAsset image, {
   BuildContext? context,
+  void Function(ImageDownloadProgress progress)? onProgress,
 }) async {
   if (context == null) return;
 

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -169,6 +171,21 @@ class _ChatScreenState extends State<ChatScreen> {
           progressNotifier.value = progress;
         },
       );
+      if (result.success && result.shouldExitApplication) {
+        progressNotifier.value = UpdateDownloadProgress(
+          phase: UpdateDownloadPhase.restarting,
+          message: result.message,
+          downloadedBytes: progressNotifier.value.totalBytes ??
+              progressNotifier.value.downloadedBytes,
+          totalBytes: progressNotifier.value.totalBytes ??
+              progressNotifier.value.downloadedBytes,
+          attempt: progressNotifier.value.attempt,
+          maxAttempts: progressNotifier.value.maxAttempts,
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 900));
+        exit(0);
+      }
+
       if (navigator.mounted && navigator.canPop()) {
         navigator.pop();
       }
@@ -772,6 +789,8 @@ class _UpdateDownloadDialog extends StatelessWidget {
           UpdateDownloadPhase.downloading => '正在下载更新',
           UpdateDownloadPhase.retrying => '正在重试下载',
           UpdateDownloadPhase.finalizing => '整理下载结果',
+          UpdateDownloadPhase.preparingInstall => '准备自动安装',
+          UpdateDownloadPhase.restarting => '正在重启应用',
           UpdateDownloadPhase.fallback => '切换浏览器下载',
         };
 
@@ -1056,49 +1075,10 @@ class ChatBubble extends StatelessWidget {
                           ),
                   ),
                   const SizedBox(height: 8),
-                  Align(
+                  _ImageDownloadAction(
+                    image: image,
                     alignment:
                         isUser ? Alignment.centerRight : Alignment.centerLeft,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: TextButton.icon(
-                        onPressed: () async => downloadImagePlatform(
-                          image,
-                          context: context,
-                        ),
-                        icon: Icon(
-                          Icons.download_rounded,
-                          color: Theme.of(context).colorScheme.primary,
-                          size: 18,
-                        ),
-                        label: Text(
-                          '下载图片',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                        ),
-                      ),
-                    ),
                   ),
                 ],
               ],
@@ -1107,6 +1087,157 @@ class ChatBubble extends StatelessWidget {
           if (isUser) const SizedBox(width: 12),
           if (isUser) avatar,
         ],
+      ),
+    );
+  }
+}
+
+class _ImageDownloadAction extends StatefulWidget {
+  final GeneratedImageAsset image;
+  final Alignment alignment;
+
+  const _ImageDownloadAction({
+    required this.image,
+    required this.alignment,
+  });
+
+  @override
+  State<_ImageDownloadAction> createState() => _ImageDownloadActionState();
+}
+
+class _ImageDownloadActionState extends State<_ImageDownloadAction> {
+  ImageDownloadProgress? _progress;
+  bool _isDownloading = false;
+
+  Future<void> _handleDownload() async {
+    if (_isDownloading) return;
+
+    setState(() {
+      _isDownloading = true;
+      _progress = const ImageDownloadProgress(
+        phase: ImageDownloadPhase.preparing,
+        message: '正在准备下载...',
+        downloadedBytes: 0,
+        totalBytes: null,
+      );
+    });
+
+    try {
+      await downloadImagePlatform(
+        widget.image,
+        context: context,
+        onProgress: (progress) {
+          if (!mounted) return;
+          setState(() {
+            _progress = progress;
+          });
+        },
+      );
+
+      if ((_progress?.phase ?? ImageDownloadPhase.preparing) ==
+          ImageDownloadPhase.completed) {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDownloading = false;
+          _progress = null;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = _progress;
+
+    return Align(
+      alignment: widget.alignment,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 280),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextButton.icon(
+                onPressed: _isDownloading ? null : _handleDownload,
+                icon: _isDownloading
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          value: progress?.progress,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      )
+                    : Icon(
+                        Icons.download_rounded,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: 18,
+                      ),
+                label: Text(
+                  _isDownloading ? '正在下载...' : '下载图片',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+              ),
+              if (_isDownloading && progress != null) ...[
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: progress.progress,
+                    minHeight: 6,
+                    backgroundColor: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest
+                        .withOpacity(0.5),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${progress.message} · ${progress.progressLabel}',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
