@@ -57,7 +57,7 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  static const String _appVersion = '1.2.1';
+  static const String _appVersion = '1.2.2';
 
   final List<ChatMessage> _messages = [];
   final TextEditingController _controller = TextEditingController();

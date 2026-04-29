@@ -1,6 +1,6 @@
 {
-  "version": "1.2.1",
-  "downloadUrl": "https://raw.githubusercontent.com/XiiSep-MAX/Xii_CHAT/main/downloads/Xii_Raw_Graph_Trial_v1.2.1.zip",
-  "releaseNotes": "🧪 下载链路测试版 1.2.1\n\n本次用于验证应用内更新体验:\n- 新增应用内 ZIP 流式下载\n- 新增下载进度显示\n- 新增自动重试与临时文件保护\n- 下载失败时自动回退浏览器下载\n\n现有图片生成能力保持不变。",
+  "version": "1.2.2",
+  "downloadUrl": "https://raw.githubusercontent.com/XiiSep-MAX/Xii_CHAT/main/downloads/Xii_Raw_Graph_Trial_v1.2.2.zip",
+  "releaseNotes": "🧪 更新功能测试版 1.2.2\n\n本次用于验证应用内自动更新体验:\n- 应用内直接下载 ZIP 更新包\n- 显示下载进度与当前状态\n- 下载中断后自动重试\n- 自动安装失败时回退到浏览器或手动覆盖\n\n这是一版专门用于测试更新链路的试用包。",
   "isForced": false
 }
