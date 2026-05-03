@@ -5,7 +5,7 @@ cd /d "%~dp0"
 
 set "POWERSHELL_EXE=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
 set "OUTPUT_ROOT=release\READY_TO_SEND\Portable_ZIP"
-set "APP_VERSION=1.2.5"
+set "APP_VERSION=1.2.6"
 set "PACKAGE_PREFIX=Xii_Raw_Graph_Trial"
 set "DOWNLOADS_DIR=downloads"
 set "HASH_OUTPUT=release\READY_TO_SEND\package_sha256.txt"
