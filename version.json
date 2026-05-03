@@ -1,6 +1,6 @@
 {
   "version": "1.2.5",
-  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.5.zip",
+  "downloadUrl": "https://github.com/XiiSep-MAX/Xii_CHAT/releases/latest/download/Xii_Raw_Graph_Trial_latest.zip",
   "sha256": "d07b60f11c19510e728204ee8b0e17ce05f6a634a7c46c6dbfc8ad84c46526ea",
   "releaseNotes": "🧪 自动更新验证版 1.2.5\n\n本次用于验证 1.2.4 修复后的自动更新链路:\n- 验证后台更新器交接是否成功\n- 验证主程序关闭后能否继续安装\n- 验证更新完成后是否会自动重新打开应用\n\n如果你已手动安装 1.2.4，现在可以直接用应用内更新测试到这一版。",
   "isForced": false,
