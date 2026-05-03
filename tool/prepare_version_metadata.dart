@@ -4,11 +4,10 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 
 Future<void> main(List<String> args) async {
-  if (args.length != 6) {
+  if (args.length != 4) {
     stderr.writeln(
       'Usage: dart run tool/prepare_version_metadata.dart '
-      '<version.json path> <zip path> <hash output path> <public hash file path> '
-      '<latest hash public file path> <download url>',
+      '<version.json path> <zip path> <hash output path> <public hash file path>',
     );
     exitCode = 64;
     return;
@@ -18,8 +17,6 @@ Future<void> main(List<String> args) async {
   final zipFile = File(args[1]);
   final hashOutputFile = File(args[2]);
   final publicHashFile = File(args[3]);
-  final latestPublicHashFile = File(args[4]);
-  final downloadUrl = args[5];
 
   if (!await versionFile.exists()) {
     stderr.writeln('version.json not found: ${versionFile.path}');
@@ -35,19 +32,14 @@ Future<void> main(List<String> args) async {
   final sha256Hex = await _computeSha256(zipFile);
   await hashOutputFile.parent.create(recursive: true);
   await publicHashFile.parent.create(recursive: true);
-  await latestPublicHashFile.parent.create(recursive: true);
 
   await hashOutputFile.writeAsString('$sha256Hex\n');
   await publicHashFile.writeAsString(
     '$sha256Hex  ${zipFile.uri.pathSegments.last}\n',
   );
-  await latestPublicHashFile.writeAsString(
-    '$sha256Hex  ${zipFile.uri.pathSegments.last}\n',
-  );
 
   final jsonMap =
       jsonDecode(await versionFile.readAsString()) as Map<String, dynamic>;
-  jsonMap['downloadUrl'] = downloadUrl;
   jsonMap['sha256'] = sha256Hex;
   jsonMap['signature'] = '';
 

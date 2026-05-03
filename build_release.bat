@@ -10,16 +10,12 @@ set "PACKAGE_PREFIX=Xii_Raw_Graph_Trial"
 set "DOWNLOADS_DIR=downloads"
 set "HASH_OUTPUT=release\READY_TO_SEND\package_sha256.txt"
 set "HASH_PUBLIC_FILE=%DOWNLOADS_DIR%\%PACKAGE_PREFIX%_v%APP_VERSION%.sha256.txt"
-set "LATEST_ASSET_NAME=%PACKAGE_PREFIX%_latest.zip"
-set "LATEST_HASH_PUBLIC_FILE=%DOWNLOADS_DIR%\%PACKAGE_PREFIX%_latest.sha256.txt"
-set "RELEASE_DOWNLOAD_URL=https://github.com/XiiSep-MAX/Xii_CHAT/releases/latest/download/%LATEST_ASSET_NAME%"
 
 for /f "tokens=2 delims=:, " %%i in ('findstr /i "\"version\"" version.json') do (
   set "APP_VERSION=%%~i"
 )
 
 set "ZIP_OUTPUT=release\READY_TO_SEND\%PACKAGE_PREFIX%_v%APP_VERSION%.zip"
-set "LATEST_ZIP_OUTPUT=release\READY_TO_SEND\%LATEST_ASSET_NAME%"
 
 echo ==========================================
 echo Building portable ZIP package
@@ -84,20 +80,8 @@ if errorlevel 1 (
   exit /b 1
 )
 
-copy /y "%ZIP_OUTPUT%" "%DOWNLOADS_DIR%\%LATEST_ASSET_NAME%" >nul
-if errorlevel 1 (
-  echo [ERROR] Failed to sync latest ZIP into repository downloads directory.
-  exit /b 1
-)
-
-copy /y "%ZIP_OUTPUT%" "%LATEST_ZIP_OUTPUT%" >nul
-if errorlevel 1 (
-  echo [ERROR] Failed to create local latest ZIP copy.
-  exit /b 1
-)
-
 echo 5. Calculating SHA-256...
-call dart run tool\prepare_version_metadata.dart version.json "%DOWNLOADS_DIR%\%LATEST_ASSET_NAME%" "%HASH_OUTPUT%" "%HASH_PUBLIC_FILE%" "%LATEST_HASH_PUBLIC_FILE%" "%RELEASE_DOWNLOAD_URL%"
+call dart run tool\prepare_version_metadata.dart version.json "%DOWNLOADS_DIR%\%PACKAGE_PREFIX%_v%APP_VERSION%.zip" "%HASH_OUTPUT%" "%HASH_PUBLIC_FILE%"
 if errorlevel 1 (
   echo [ERROR] Failed to calculate SHA-256 or update version.json.
   exit /b 1
@@ -115,13 +99,10 @@ echo Portable ZIP package created successfully:
 echo   Staging: %OUTPUT_ROOT%
 echo   Zip:    %ZIP_OUTPUT%
 echo   Repo:   %DOWNLOADS_DIR%\%PACKAGE_PREFIX%_v%APP_VERSION%.zip
-echo   Latest: %DOWNLOADS_DIR%\%LATEST_ASSET_NAME%
 echo   SHA256: %HASH_OUTPUT%
 echo   Public: %HASH_PUBLIC_FILE%
-echo   Latest SHA256: %LATEST_HASH_PUBLIC_FILE%
-echo   Release URL: %RELEASE_DOWNLOAD_URL%
 echo.
 echo Recommended next step:
-echo   Upload %LATEST_ASSET_NAME% to the latest GitHub Release, then commit and push the updated page and version metadata.
+echo   Commit and push the updated ZIP, SHA256 file, index.html, and version.json to GitHub.
 
 endlocal
