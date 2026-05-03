@@ -51,7 +51,8 @@ OPENAI_API_KEY=sk-your-actual-api-key-here
 
 #### 方法三：便携版目录下创建 `.env`
 
-如果你运行的是便携版，可以直接在程序目录里把 `.env.example` 复制并重命名为 `.env`，再填入真实 Key。
+如果你运行的是便携版，发布包里会自带 `.env.example`，默认可直接连接 Worker 网关。
+如果你需要改成自己的接口，再把 `.env.example` 复制并重命名为 `.env`，按需填写配置。
 
 ### 3. 验证配置
 

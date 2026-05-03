@@ -4,8 +4,8 @@
   "mirrorUrls": [
     "https://github.com/XiiSep-MAX/Xii_CHAT/releases/download/v1.2.7/Xii_Raw_Graph_Trial_v1.2.7.zip"
   ],
-  "sha256": "c9eab9912de84644c65a6f9aa1cae48379472b90b8bbf3bbebf296b230f99db8",
+  "sha256": "d70b6e3c7cb26724ead5779880f77c7e8de50154ad6e4d223a21f7a9ce91fc0b",
   "releaseNotes": "⚡ 更新下载优化版 1.2.7\n\n本次更新包含：\n- 自动更新支持主下载源失败后的备用镜像回退\n- 保持版本元数据签名与安装包完整性校验\n- 同步最新界面与下载流程调整",
   "isForced": false,
-  "signature": "aTECyuSEjfp3BEyTZM/iDVYFmPX+l4B72ccYrbgP6gLPBPimWiPMjRsextFvIxoAUsHVRSatSF/V5/YcC5z1Ag=="
+  "signature": "TTgHO1zAudyPvICXCanSXO0C7vJfXbFVlF29Mqp+e5x0BFoUk3MVzJKGXdl2PX7lwYw0pIPcyLLH55dvWVs1Aw=="
 }
