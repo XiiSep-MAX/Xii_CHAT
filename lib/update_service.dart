@@ -64,99 +64,95 @@ class UpdateService {
         return const UpdateInstallResult.failure('便携版更新仅支持 Windows 桌面版。');
       }
 
-      final downloadUrl = versionInfo.downloadUrl.trim();
-      if (downloadUrl.isEmpty) {
+      final downloadCandidates = versionInfo.downloadCandidates;
+      if (downloadCandidates.isEmpty) {
         return const UpdateInstallResult.failure('未配置更新下载地址。');
       }
 
-      final uri = Uri.tryParse(downloadUrl);
-      if (uri == null) {
-        return UpdateInstallResult.failure('更新地址格式无效: $downloadUrl');
-      }
+      Object? lastError;
+      for (var index = 0; index < downloadCandidates.length; index++) {
+        final downloadUrl = downloadCandidates[index].trim();
+        if (downloadUrl.isEmpty) {
+          continue;
+        }
 
-      final packageType = _detectPackageTypeFromUri(uri);
+        final uri = Uri.tryParse(downloadUrl);
+        if (uri == null) {
+          lastError = '更新地址格式无效: $downloadUrl';
+          continue;
+        }
 
-      if (packageType == _UpdatePackageType.zipPackage ||
-          packageType == _UpdatePackageType.executable) {
-        try {
-          final localPackage = await _downloadPortablePackage(
-            uri: uri,
-            version: versionInfo.version,
-            packageType: packageType,
-            onProgress: onProgress,
-          );
-          await _verifyPackageIntegrity(
-            localPackage: localPackage,
-            versionInfo: versionInfo,
-            onProgress: onProgress,
-          );
-          if (packageType == _UpdatePackageType.zipPackage) {
-            try {
-              onProgress?.call(
-                UpdateDownloadProgress(
-                  phase: UpdateDownloadPhase.preparingInstall,
-                  message: '下载完成，正在准备自动安装...',
-                  downloadedBytes: await localPackage.length(),
-                  totalBytes: await localPackage.length(),
-                  attempt: 1,
-                  maxAttempts: _maxDownloadAttempts,
-                ),
-              );
+        final packageType = _detectPackageTypeFromUri(uri);
+        if (packageType == _UpdatePackageType.zipPackage ||
+            packageType == _UpdatePackageType.executable) {
+          try {
+            final localPackage = await _downloadPortablePackage(
+              uri: uri,
+              version: versionInfo.version,
+              packageType: packageType,
+              onProgress: onProgress,
+            );
+            await _verifyPackageIntegrity(
+              localPackage: localPackage,
+              versionInfo: versionInfo,
+              onProgress: onProgress,
+            );
+            if (packageType == _UpdatePackageType.zipPackage) {
+              try {
+                onProgress?.call(
+                  UpdateDownloadProgress(
+                    phase: UpdateDownloadPhase.preparingInstall,
+                    message: '下载完成，正在准备自动安装...',
+                    downloadedBytes: await localPackage.length(),
+                    totalBytes: await localPackage.length(),
+                    attempt: 1,
+                    maxAttempts: _maxDownloadAttempts,
+                  ),
+                );
 
-              await _launchAutomaticZipUpdate(localPackage: localPackage);
-              return const UpdateInstallResult.autoRestart(
-                '更新包已下载完成，应用将自动关闭并安装新版本。',
-              );
-            } catch (error) {
-              stderr.writeln('自动安装启动失败: $error');
-              final opened = await _openFolderAndSelectFile(localPackage.path);
-              final suffix = opened ? '，并已为你打开所在目录。' : '。';
-              return UpdateInstallResult.success(
-                '更新包已下载到：${localPackage.path}$suffix\n\n'
-                '自动安装未能启动，请先关闭当前版本，再手动解压覆盖。',
-              );
+                await _launchAutomaticZipUpdate(localPackage: localPackage);
+                return const UpdateInstallResult.autoRestart(
+                  '更新包已下载完成，应用将自动关闭并安装新版本。',
+                );
+              } catch (error) {
+                stderr.writeln('自动安装启动失败: $error');
+                final opened =
+                    await _openFolderAndSelectFile(localPackage.path);
+                final suffix = opened ? '，并已为你打开所在目录。' : '。';
+                return UpdateInstallResult.success(
+                  '更新包已下载到：${localPackage.path}$suffix\n\n'
+                  '自动安装未能启动，请先关闭当前版本，再手动解压覆盖。',
+                );
+              }
             }
-          }
 
-          final opened = await _openFolderAndSelectFile(localPackage.path);
-          final suffix = opened ? '，并已为你打开所在目录。' : '。';
-          return UpdateInstallResult.success(
-            '更新包已下载到：${localPackage.path}$suffix\n\n'
-            '请关闭旧版本后运行新文件。',
-          );
-        } on TimeoutException catch (error) {
-          stderr.writeln('自动下载超时: $error');
-          return _fallbackToBrowserDownload(
-            downloadUrl: downloadUrl,
-            onProgress: onProgress,
-            reason: '自动下载超时',
-          );
-        } on SocketException catch (error) {
-          stderr.writeln('自动下载网络异常: $error');
-          return _fallbackToBrowserDownload(
-            downloadUrl: downloadUrl,
-            onProgress: onProgress,
-            reason: '网络连接不稳定',
-          );
-        } on HttpException catch (error) {
-          stderr.writeln('自动下载 HTTP 异常: $error');
-          return _fallbackToBrowserDownload(
-            downloadUrl: downloadUrl,
-            onProgress: onProgress,
-            reason: '下载源暂时不可用',
+            final opened = await _openFolderAndSelectFile(localPackage.path);
+            final suffix = opened ? '，并已为你打开所在目录。' : '。';
+            return UpdateInstallResult.success(
+              '更新包已下载到：${localPackage.path}$suffix\n\n'
+              '请关闭旧版本后运行新文件。',
+            );
+          } catch (error) {
+            lastError = error;
+            stderr.writeln(
+              '下载源尝试失败（${index + 1}/${downloadCandidates.length}）: $error',
+            );
+            continue;
+          }
+        }
+
+        final opened = await openDownloadUrl(downloadUrl);
+        if (opened) {
+          return const UpdateInstallResult.success(
+            '已为你打开更新下载页，请按页面提示获取最新版本。',
           );
         }
       }
 
-      final opened = await openDownloadUrl(downloadUrl);
-      if (opened) {
-        return const UpdateInstallResult.success(
-          '已为你打开更新下载页，请按页面提示获取最新版本。',
-        );
-      }
-
-      return const UpdateInstallResult.failure(
-        '无法识别更新包类型，请手动打开下载链接。',
+      return _fallbackToBrowserDownload(
+        downloadUrl: versionInfo.downloadUrl,
+        onProgress: onProgress,
+        reason: lastError == null ? '下载源不可用' : lastError.toString(),
       );
     } catch (e) {
       stderr.writeln('更新启动失败: $e');
@@ -906,6 +902,7 @@ class UpdateInstallResult {
 class VersionInfo {
   final String version;
   final String downloadUrl;
+  final List<String> mirrorUrls;
   final String? sha256;
   final String? signature;
   final String releaseNotes;
@@ -914,6 +911,7 @@ class VersionInfo {
   VersionInfo({
     required this.version,
     required this.downloadUrl,
+    this.mirrorUrls = const [],
     this.sha256,
     this.signature,
     required this.releaseNotes,
@@ -924,6 +922,12 @@ class VersionInfo {
     return VersionInfo(
       version: json['version'] ?? '1.0.0',
       downloadUrl: json['downloadUrl'] ?? '',
+      mirrorUrls: (json['mirrorUrls'] is List)
+          ? (json['mirrorUrls'] as List)
+              .map((item) => item.toString())
+              .where((item) => item.trim().isNotEmpty)
+              .toList(growable: false)
+          : const [],
       sha256: json['sha256']?.toString(),
       signature: json['signature']?.toString(),
       releaseNotes: json['releaseNotes'] ?? 'New version available',
@@ -931,9 +935,24 @@ class VersionInfo {
     );
   }
 
+  List<String> get downloadCandidates {
+    final candidates = <String>[];
+    final seen = <String>{};
+
+    for (final item in [downloadUrl, ...mirrorUrls]) {
+      final trimmed = item.trim();
+      if (trimmed.isNotEmpty && seen.add(trimmed)) {
+        candidates.add(trimmed);
+      }
+    }
+
+    return candidates;
+  }
+
   Map<String, dynamic> toJson() => {
         'version': version,
         'downloadUrl': downloadUrl,
+        'mirrorUrls': mirrorUrls,
         'sha256': sha256,
         'signature': signature,
         'releaseNotes': releaseNotes,
