@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Xii_Raw Graph 隐私政策</title>
+    <style>
+      :root {
+        --bg: #f6f3ee;
+        --panel: rgba(255, 255, 255, 0.92);
+        --text: #1f2937;
+        --muted: #5f6b7a;
+        --line: rgba(31, 41, 55, 0.12);
+        --accent: #0f766e;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(15, 118, 110, 0.12), transparent 35%),
+          linear-gradient(160deg, #faf7f2 0%, #f2ece4 100%);
+      }
+
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 40px 18px 80px;
+      }
+
+      article {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 26px;
+        padding: 32px 26px;
+        box-shadow: 0 20px 50px rgba(31, 41, 55, 0.08);
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: clamp(30px, 5vw, 42px);
+      }
+
+      h2 {
+        margin-top: 28px;
+        margin-bottom: 12px;
+        font-size: 20px;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+        line-height: 1.8;
+      }
+
+      ul {
+        padding-left: 20px;
+      }
+
+      .meta {
+        margin-bottom: 22px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .nav {
+        margin-top: 28px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .nav a {
+        text-decoration: none;
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      code {
+        padding: 2px 6px;
+        border-radius: 8px;
+        background: rgba(31, 41, 55, 0.06);
+        font-family: "Cascadia Code", "Consolas", monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article>
+        <h1>Xii_Raw Graph 隐私政策</h1>
+        <p class="meta">最近更新：2026-05-01</p>
+
+        <p>
+          本隐私政策适用于 Xii_Raw Graph Windows 桌面应用、相关下载页面以及配套授权与更新服务。使用本产品即表示你理解并同意本政策中所述的数据处理方式。
+        </p>
+
+        <h2>1. 我们收集或处理的数据类型</h2>
+        <ul>
+          <li>你在应用内输入的文本提示词。</li>
+          <li>你主动选择上传的参考图片。</li>
+          <li>应用本地生成和保存的会话记录、生图历史和切换记录。</li>
+          <li>用于授权校验的激活码、设备绑定信息和授权状态。</li>
+          <li>用于版本更新的版本号、下载请求和更新包完整性校验信息。</li>
+        </ul>
+
+        <h2>2. 本地数据存储</h2>
+        <p>
+          应用会在你的设备本地使用 SQLite 保存部分数据，包括多会话记录、消息内容、生图历史、参考图信息以及授权状态，用于支持历史恢复、会话切换和桌面端持续工作流。
+        </p>
+
+        <h2>3. 云端授权与激活码服务</h2>
+        <p>
+          当你输入激活码或刷新授权状态时，应用会请求我们的授权服务，用于校验激活码是否有效、是否已过期、是否超过设备绑定数量限制，并在成功时返回授权令牌。
+        </p>
+
+        <h2>4. 云端 AI 生成服务</h2>
+        <p>
+          当你使用 AI 生成功能时，应用会将必要的提示词、参考图和生成参数发送到我们的云端代理服务，再由该服务转发给模型服务提供方完成图像生成。应用不会向你本地公开上游模型服务的密钥。
+        </p>
+
+        <h2>5. 自动更新与完整性校验</h2>
+        <p>
+          应用会访问 <code>version.json</code> 等更新元数据，用于检查新版本。下载更新包后，应用会在本地校验更新包的 <code>SHA-256</code>，校验通过后才允许自动安装。
+        </p>
+
+        <h2>6. 我们如何使用这些数据</h2>
+        <ul>
+          <li>提供 AI 图像生成与参考图生成能力。</li>
+          <li>保存本地历史记录，支持多会话恢复。</li>
+          <li>完成激活码校验、设备绑定与高级功能解锁。</li>
+          <li>提供桌面端自动更新与更新完整性验证。</li>
+          <li>在出现异常时协助排查授权、更新或服务调用问题。</li>
+        </ul>
+
+        <h2>7. 数据共享</h2>
+        <p>
+          我们不会将你的本地数据出售给第三方。但在实现产品功能所必需的范围内，部分请求会发送到云端服务，例如授权服务、更新服务以及模型服务代理链路。
+        </p>
+
+        <h2>8. 你的选择</h2>
+        <ul>
+          <li>你可以不输入激活码，但部分高级功能将不可用。</li>
+          <li>你可以在应用内删除会话、清空历史记录或移除部分本地数据。</li>
+          <li>你可以停止使用应用并自行删除本地程序目录和相关本地数据文件。</li>
+        </ul>
+
+        <h2>9. 联系我们</h2>
+        <p>
+          如需咨询隐私问题、数据问题或授权问题，请通过支持页面或公开联系方式与我们联系。
+        </p>
+
+        <div class="nav">
+          <a href="/">返回下载页</a>
+          <a href="/support.html">打开支持页面</a>
+        </div>
+      </article>
+    </main>
+  </body>
+</html>

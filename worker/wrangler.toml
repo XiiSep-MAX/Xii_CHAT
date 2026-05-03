@@ -1,0 +1,16 @@
+name = "xii-license-worker"
+main = "src/index.ts"
+compatibility_date = "2026-04-30"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "xii-license-db"
+database_id = "f57b3eb3-7db9-4e2a-b5ba-24c622543cd9"
+
+[vars]
+UPSTREAM_BASE_URL = "https://www.packyapi.com/v1/chat/completions"
+UPSTREAM_MODEL = "gpt-image-2"
+
+[[routes]]
+pattern = "api.xiimax.top"
+custom_domain = true

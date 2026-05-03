@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cryptography/cryptography.dart';
+import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
@@ -9,8 +11,9 @@ import 'package:path_provider/path_provider.dart';
 /// 版本更新服务 - 检查并管理应用版本更新
 class UpdateService {
   // 版本检查元数据地址
-  static const String _versionCheckUrl =
-      'https://raw.githubusercontent.com/XiiSep-MAX/Xii_CHAT/main/version.json';
+  static const String _versionCheckUrl = 'https://xiimax.top/version.json';
+  static const String _versionMetadataPublicKeyBase64 =
+      '1nB4xTxmJvKrjav06LtiBwTa6BUi57Z5hySt6RfYDvE=';
   static const String _bundledUpdaterFileName = 'xii_updater.exe';
   static const List<String> _preservedInstallFiles = ['.env'];
   static const Duration _packageConnectTimeout = Duration(seconds: 20);
@@ -38,6 +41,11 @@ class UpdateService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final isValid = await _verifyVersionMetadataSignature(data);
+        if (!isValid) {
+          stderr.writeln('版本元数据签名校验失败，已忽略本次更新检查。');
+          return null;
+        }
         return VersionInfo.fromJson(data);
       }
     } catch (e) {
@@ -75,6 +83,11 @@ class UpdateService {
             uri: uri,
             version: versionInfo.version,
             packageType: packageType,
+            onProgress: onProgress,
+          );
+          await _verifyPackageIntegrity(
+            localPackage: localPackage,
+            versionInfo: versionInfo,
             onProgress: onProgress,
           );
           if (packageType == _UpdatePackageType.zipPackage) {
@@ -410,6 +423,86 @@ class UpdateService {
     }
   }
 
+  static Future<void> _verifyPackageIntegrity({
+    required File localPackage,
+    required VersionInfo versionInfo,
+    void Function(UpdateDownloadProgress progress)? onProgress,
+  }) async {
+    final expectedSha256 = versionInfo.sha256?.trim().toLowerCase();
+    if (expectedSha256 == null || expectedSha256.isEmpty) {
+      throw Exception('更新元数据缺少 sha256，已拒绝自动安装。');
+    }
+
+    final packageLength = await localPackage.length();
+    onProgress?.call(
+      UpdateDownloadProgress(
+        phase: UpdateDownloadPhase.verifying,
+        message: '下载完成，正在校验更新包完整性...',
+        downloadedBytes: packageLength,
+        totalBytes: packageLength,
+        attempt: 1,
+        maxAttempts: _maxDownloadAttempts,
+      ),
+    );
+
+    final actualSha256 = await _computeSha256(localPackage);
+    if (actualSha256 != expectedSha256) {
+      throw Exception(
+        '更新包校验失败：期望 sha256 为 $expectedSha256，实际为 $actualSha256。',
+      );
+    }
+  }
+
+  static Future<String> _computeSha256(File file) async {
+    final chunks = <int>[];
+    await for (final chunk in file.openRead()) {
+      chunks.addAll(chunk);
+    }
+    return sha256.convert(chunks).toString().toLowerCase();
+  }
+
+  static Future<bool> _verifyVersionMetadataSignature(
+    Map<String, dynamic> jsonMap,
+  ) async {
+    final signatureBase64 = jsonMap['signature']?.toString().trim() ?? '';
+    if (signatureBase64.isEmpty) {
+      return false;
+    }
+
+    if (_versionMetadataPublicKeyBase64 == 'REPLACE_WITH_PUBLIC_KEY_BASE64') {
+      stderr.writeln('尚未配置更新元数据签名公钥。');
+      return false;
+    }
+
+    final canonicalMap = Map<String, dynamic>.from(jsonMap)
+      ..remove('signature');
+    final payload = _canonicalJson(canonicalMap);
+
+    final algorithm = Ed25519();
+    final publicKey = SimplePublicKey(
+      base64Decode(_versionMetadataPublicKeyBase64),
+      type: KeyPairType.ed25519,
+    );
+    final signature = Signature(
+      base64Decode(signatureBase64),
+      publicKey: publicKey,
+    );
+
+    return algorithm.verify(
+      utf8.encode(payload),
+      signature: signature,
+    );
+  }
+
+  static String _canonicalJson(Map<String, dynamic> jsonMap) {
+    final sortedKeys = jsonMap.keys.toList()..sort();
+    final canonicalMap = <String, dynamic>{};
+    for (final key in sortedKeys) {
+      canonicalMap[key] = jsonMap[key];
+    }
+    return jsonEncode(canonicalMap);
+  }
+
   static bool _shouldRetry(Object error) {
     return error is TimeoutException ||
         error is SocketException ||
@@ -740,6 +833,7 @@ enum UpdateDownloadPhase {
   downloading,
   retrying,
   finalizing,
+  verifying,
   preparingInstall,
   restarting,
   fallback,
@@ -812,12 +906,16 @@ class UpdateInstallResult {
 class VersionInfo {
   final String version;
   final String downloadUrl;
+  final String? sha256;
+  final String? signature;
   final String releaseNotes;
   final bool isForced; // 是否强制更新
 
   VersionInfo({
     required this.version,
     required this.downloadUrl,
+    this.sha256,
+    this.signature,
     required this.releaseNotes,
     this.isForced = false,
   });
@@ -826,6 +924,8 @@ class VersionInfo {
     return VersionInfo(
       version: json['version'] ?? '1.0.0',
       downloadUrl: json['downloadUrl'] ?? '',
+      sha256: json['sha256']?.toString(),
+      signature: json['signature']?.toString(),
       releaseNotes: json['releaseNotes'] ?? 'New version available',
       isForced: json['isForced'] ?? false,
     );
@@ -834,6 +934,8 @@ class VersionInfo {
   Map<String, dynamic> toJson() => {
         'version': version,
         'downloadUrl': downloadUrl,
+        'sha256': sha256,
+        'signature': signature,
         'releaseNotes': releaseNotes,
         'isForced': isForced,
       };

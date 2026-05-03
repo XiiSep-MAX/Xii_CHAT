@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'env_config.dart';
+import 'license_service.dart';
 import 'models.dart';
 
 // 从环境变量获取 API Key（安全方式）
@@ -50,21 +51,40 @@ class OpenAIChatService {
     return 'gpt-image-2';
   }
 
+  static String? get _workerBaseUrl {
+    final configured = EnvConfig.get('LICENSE_API_BASE_URL')?.trim();
+    if (configured == null || configured.isEmpty) {
+      return null;
+    }
+    return configured.replaceAll(RegExp(r'/+$'), '');
+  }
+
   Future<ChatResponse> sendMessage({
     required String prompt,
     required ImageGenerationOptions options,
     ChatImageAttachment? imageAttachment,
   }) async {
-    if (openAIApiKey.isEmpty || openAIApiKey == '<YOUR_OPENAI_API_KEY>') {
-      throw Exception('请在环境变量或 .env 文件中填写可用的 API Key。');
-    }
-
     final normalizedOptions = options.normalized();
     final composedPrompt = _composePrompt(
       prompt: prompt,
       options: normalizedOptions,
       hasReferenceImage: imageAttachment != null,
     );
+
+    final workerBaseUrl = _workerBaseUrl;
+    if (workerBaseUrl != null && workerBaseUrl.isNotEmpty) {
+      return _sendViaWorker(
+        workerBaseUrl: workerBaseUrl,
+        prompt: prompt,
+        composedPrompt: composedPrompt,
+        options: normalizedOptions,
+        imageAttachment: imageAttachment,
+      );
+    }
+
+    if (openAIApiKey.isEmpty || openAIApiKey == '<YOUR_OPENAI_API_KEY>') {
+      throw Exception('请在环境变量或 .env 文件中填写可用的 API Key。');
+    }
 
     final response = await http.post(
       Uri.parse(_apiUrl),
@@ -100,6 +120,48 @@ class OpenAIChatService {
     return _parseResponseContent(
       content,
       options: normalizedOptions,
+      isEditRequest: imageAttachment != null,
+    );
+  }
+
+  Future<ChatResponse> _sendViaWorker({
+    required String workerBaseUrl,
+    required String prompt,
+    required String composedPrompt,
+    required ImageGenerationOptions options,
+    required ChatImageAttachment? imageAttachment,
+  }) async {
+    final licenseStatus = await LicenseService.instance.initialize();
+    final response = await http.post(
+      Uri.parse('$workerBaseUrl/v1/chat/generate'),
+      headers: const {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'token': licenseStatus.licenseToken,
+        'installId': licenseStatus.installId,
+        'prompt': prompt,
+        'composedPrompt': composedPrompt,
+        'aspectRatio': options.aspectRatio,
+        'referenceImage': imageAttachment == null
+            ? null
+            : {
+                'name': imageAttachment.name,
+                'mimeType': imageAttachment.mimeType,
+                'bytesBase64': base64Encode(imageAttachment.bytes),
+              },
+      }),
+    );
+
+    final body = _decodeJsonFromResponse(response);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(_extractErrorMessage(response, body));
+    }
+
+    final content = body['content'] ?? body['data'] ?? body;
+    return _parseResponseContent(
+      content,
+      options: options,
       isEditRequest: imageAttachment != null,
     );
   }
@@ -143,7 +205,8 @@ class OpenAIChatService {
   }
 
   Map<String, dynamic> _decodeJsonFromResponse(http.Response response) {
-    final rawBody = utf8.decode(response.bodyBytes, allowMalformed: true).trim();
+    final rawBody =
+        utf8.decode(response.bodyBytes, allowMalformed: true).trim();
     if (rawBody.isEmpty) {
       return const <String, dynamic>{};
     }
@@ -280,6 +343,9 @@ class OpenAIChatService {
     http.Response response,
     Map<String, dynamic> body,
   ) {
+    if (body['error'] != null) {
+      return body['error'].toString();
+    }
     final error = body['error'];
     if (error is Map && error['message'] != null) {
       return '图片生成请求失败：${error['message']}';

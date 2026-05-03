@@ -10,11 +10,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  cryptography: ^2.7.0
+  crypto: ^3.0.3
   http: ^1.1.0
   cached_network_image: ^3.2.3
   file_picker: ^8.0.7
   path_provider: ^2.1.0
   path: ^1.8.0
+  sqflite_common_ffi: ^2.3.3
 
 dev_dependencies:
   flutter_test:
@@ -25,3 +28,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+hooks:
+  user_defines:
+    sqlite3:
+      source: system
+      name_windows: winsqlite3
+      name: sqlite3

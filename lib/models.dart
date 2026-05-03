@@ -88,6 +88,7 @@ class ImageGenerationOptions {
 }
 
 class ChatMessage {
+  final int? id;
   final String text;
   final Role role;
   final DateTime createdAt;
@@ -96,6 +97,7 @@ class ChatMessage {
   final ImageGenerationOptions? generationOptions;
 
   ChatMessage({
+    this.id,
     required this.text,
     required this.role,
     this.generatedImages = const [],
@@ -105,4 +107,164 @@ class ChatMessage {
   }) : createdAt = createdAt ?? DateTime.now();
 
   bool get hasImages => generatedImages.isNotEmpty || localImages.isNotEmpty;
+}
+
+class ChatSessionInfo {
+  final int id;
+  final String title;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? lastActivatedAt;
+  final int messageCount;
+  final int switchCount;
+
+  const ChatSessionInfo({
+    required this.id,
+    required this.title,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.lastActivatedAt,
+    required this.messageCount,
+    required this.switchCount,
+  });
+
+  DateTime get sortTime => lastActivatedAt ?? updatedAt;
+}
+
+class GeneratedImageHistoryEntry {
+  final int id;
+  final int sessionId;
+  final int messageId;
+  final String sessionTitle;
+  final String messageText;
+  final DateTime createdAt;
+  final String? aspectRatio;
+  final GeneratedImageAsset image;
+
+  const GeneratedImageHistoryEntry({
+    required this.id,
+    required this.sessionId,
+    required this.messageId,
+    required this.sessionTitle,
+    required this.messageText,
+    required this.createdAt,
+    required this.aspectRatio,
+    required this.image,
+  });
+}
+
+class SessionSwitchLogEntry {
+  final int id;
+  final int sessionId;
+  final DateTime switchedAt;
+
+  const SessionSwitchLogEntry({
+    required this.id,
+    required this.sessionId,
+    required this.switchedAt,
+  });
+}
+
+class LicenseStatus {
+  static const int defaultTrialGenerationLimit = 3;
+
+  final String installId;
+  final bool workerConfigured;
+  final bool isDevelopmentBypass;
+  final String? licenseToken;
+  final String? tier;
+  final DateTime? expiresAt;
+  final DateTime? lastValidatedAt;
+  final int trialUsageCount;
+  final int trialUsageLimit;
+
+  const LicenseStatus({
+    required this.installId,
+    required this.workerConfigured,
+    required this.isDevelopmentBypass,
+    required this.licenseToken,
+    required this.tier,
+    required this.expiresAt,
+    required this.lastValidatedAt,
+    required this.trialUsageCount,
+    required this.trialUsageLimit,
+  });
+
+  bool get isExpired =>
+      expiresAt != null && expiresAt!.isBefore(DateTime.now());
+
+  bool get isActivated =>
+      licenseToken != null && licenseToken!.isNotEmpty && !isExpired;
+
+  bool get isPremium => isDevelopmentBypass || isActivated;
+
+  int get remainingTrialUses {
+    if (isDevelopmentBypass) {
+      return trialUsageLimit;
+    }
+
+    final remaining = trialUsageLimit - trialUsageCount;
+    return remaining > 0 ? remaining : 0;
+  }
+
+  bool get canUseGeneration {
+    if (isDevelopmentBypass) {
+      return true;
+    }
+    return isPremium;
+  }
+
+  String get badgeLabel {
+    if (isDevelopmentBypass) {
+      return '开发模式';
+    }
+    if (isPremium) {
+      return tier == null || tier!.isEmpty ? '高级版' : '${tier!} 已激活';
+    }
+    return '试用剩余 $remainingTrialUses 次';
+  }
+
+  String get summaryText {
+    if (isDevelopmentBypass) {
+      return '当前未启用商业授权校验，客户端会直接使用本地开发配置请求上游接口。';
+    }
+    if (isPremium) {
+      final expiryText = expiresAt == null
+          ? '永久授权'
+          : '有效期至 ${expiresAt!.year}-${expiresAt!.month.toString().padLeft(2, '0')}-${expiresAt!.day.toString().padLeft(2, '0')}';
+      return '${tier ?? '高级版'}已激活，$expiryText。';
+    }
+    return '当前已启用商业授权校验，请先输入激活码后再使用生成能力。';
+  }
+
+  LicenseStatus copyWith({
+    String? installId,
+    bool? workerConfigured,
+    bool? isDevelopmentBypass,
+    String? licenseToken,
+    bool clearLicenseToken = false,
+    String? tier,
+    bool clearTier = false,
+    DateTime? expiresAt,
+    bool clearExpiresAt = false,
+    DateTime? lastValidatedAt,
+    bool clearLastValidatedAt = false,
+    int? trialUsageCount,
+    int? trialUsageLimit,
+  }) {
+    return LicenseStatus(
+      installId: installId ?? this.installId,
+      workerConfigured: workerConfigured ?? this.workerConfigured,
+      isDevelopmentBypass: isDevelopmentBypass ?? this.isDevelopmentBypass,
+      licenseToken:
+          clearLicenseToken ? null : (licenseToken ?? this.licenseToken),
+      tier: clearTier ? null : (tier ?? this.tier),
+      expiresAt: clearExpiresAt ? null : (expiresAt ?? this.expiresAt),
+      lastValidatedAt: clearLastValidatedAt
+          ? null
+          : (lastValidatedAt ?? this.lastValidatedAt),
+      trialUsageCount: trialUsageCount ?? this.trialUsageCount,
+      trialUsageLimit: trialUsageLimit ?? this.trialUsageLimit,
+    );
+  }
 }

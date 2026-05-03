@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - index.html
+      - privacy.html
+      - support.html
       - version.json
       - CONTACT_AUTHOR_WX.txt
       - downloads/**
@@ -38,9 +40,12 @@ jobs:
           rm -rf _site
           mkdir -p _site/downloads
           cp index.html _site/index.html
+          cp privacy.html _site/privacy.html
+          cp support.html _site/support.html
           cp version.json _site/version.json
           cp CONTACT_AUTHOR_WX.txt _site/CONTACT_AUTHOR_WX.txt
           cp downloads/*.zip _site/downloads/
+          cp downloads/*.sha256.txt _site/downloads/ || true
           touch _site/.nojekyll
 
       - name: Upload Pages artifact

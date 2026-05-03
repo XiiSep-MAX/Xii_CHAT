@@ -1,0 +1,15 @@
+{
+  "name": "xii-license-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "license": "node ./scripts/license-admin.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260415.0",
+    "typescript": "^5.8.3",
+    "wrangler": "^4.14.4"
+  }
+}

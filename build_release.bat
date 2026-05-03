@@ -8,6 +8,8 @@ set "OUTPUT_ROOT=release\READY_TO_SEND\Portable_ZIP"
 set "APP_VERSION=1.2.5"
 set "PACKAGE_PREFIX=Xii_Raw_Graph_Trial"
 set "DOWNLOADS_DIR=downloads"
+set "HASH_OUTPUT=release\READY_TO_SEND\package_sha256.txt"
+set "HASH_PUBLIC_FILE=%DOWNLOADS_DIR%\%PACKAGE_PREFIX%_v%APP_VERSION%.sha256.txt"
 
 for /f "tokens=2 delims=:, " %%i in ('findstr /i "\"version\"" version.json') do (
   set "APP_VERSION=%%~i"
@@ -78,13 +80,29 @@ if errorlevel 1 (
   exit /b 1
 )
 
+echo 5. Calculating SHA-256...
+call dart run tool\prepare_version_metadata.dart version.json "%DOWNLOADS_DIR%\%PACKAGE_PREFIX%_v%APP_VERSION%.zip" "%HASH_OUTPUT%" "%HASH_PUBLIC_FILE%"
+if errorlevel 1 (
+  echo [ERROR] Failed to calculate SHA-256 or update version.json.
+  exit /b 1
+)
+
+echo 6. Signing version metadata...
+call dart run tool\sign_version_metadata.dart version.json
+if errorlevel 1 (
+  echo [ERROR] Failed to sign version.json.
+  exit /b 1
+)
+
 echo.
 echo Portable ZIP package created successfully:
 echo   Staging: %OUTPUT_ROOT%
 echo   Zip:    %ZIP_OUTPUT%
 echo   Repo:   %DOWNLOADS_DIR%\%PACKAGE_PREFIX%_v%APP_VERSION%.zip
+echo   SHA256: %HASH_OUTPUT%
+echo   Public: %HASH_PUBLIC_FILE%
 echo.
 echo Recommended next step:
-echo   Commit and push the updated ZIP, index.html, and version.json to GitHub.
+echo   Commit and push the updated ZIP, SHA256 file, index.html, and version.json to GitHub.
 
 endlocal

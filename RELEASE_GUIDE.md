@@ -1,12 +1,12 @@
 # Windows 发布指南
 
-当前最终落地方案：
+当前正式发布链路：
 
-- 打包成 `免安装 EXE 压缩包（ZIP）`
-- 把 ZIP 放到仓库 `downloads/` 目录并推送到 GitHub
-- 开启 `GitHub Pages`
-- 用极简静态下载页承接下载链接和使用说明
-- 同步提供 `CONTACT_AUTHOR_WX.txt` 作为下载异常兜底
+- 打包成 `Windows 便携 ZIP`
+- ZIP 放到仓库 `downloads/`
+- 页面与更新元数据通过 `xiimax.top`
+- `version.json` 提供 `downloadUrl + sha256`
+- 客户端下载后先校验 `SHA-256`，校验通过才允许自动安装
 
 ---
 
@@ -18,124 +18,127 @@
 build_release.bat
 ```
 
-输出位置：
+脚本会自动完成：
 
-- ZIP 包：`release/READY_TO_SEND/Xii_Raw_Graph_Portable_v<version>.zip`
+1. `flutter build windows --release`
+2. 编译 `xii_updater.exe`
+3. 打包 ZIP
+4. 复制 ZIP 到 `downloads/`
+5. 计算 ZIP 的 `SHA-256`
+6. 回写 `version.json` 里的 `sha256`
+7. 生成一个公开校验文件 `*.sha256.txt`
+
+主要输出位置：
+
+- ZIP 包：`release/READY_TO_SEND/Xii_Raw_Graph_Trial_v<version>.zip`
 - 打包目录：`release/READY_TO_SEND/Portable_ZIP/`
-
-ZIP 包内默认包含：
-
-- `ai_chat_app.exe`
-- `data/`
-- `flutter_windows.dll` 等运行库
-- `USER_SETUP_GUIDE.md`
-- `PORTABLE_PACKAGE_README.md`
-- `CONTACT_AUTHOR_WX.txt`
+- 仓库下载包：`downloads/Xii_Raw_Graph_Trial_v<version>.zip`
+- 校验文件：`downloads/Xii_Raw_Graph_Trial_v<version>.sha256.txt`
+- 构建阶段哈希记录：`release/READY_TO_SEND/package_sha256.txt`
 
 ---
 
-## 2. 上传到 GitHub
+## 2. 发布时需要提交的文件
 
-推荐同时同步到以下两个位置：
+至少提交并推送这些内容：
 
-1. `downloads/`
-   这是用户主下载入口。
-
-2. `仓库根目录`
-   用于承载 `index.html` 和 `version.json`。
-
-建议至少上传：
-
-- 最新 ZIP 发布包
-- `CONTACT_AUTHOR_WX.txt`
+- `downloads/Xii_Raw_Graph_Trial_v<version>.zip`
+- `downloads/Xii_Raw_Graph_Trial_v<version>.sha256.txt`
+- `version.json`
+- `index.html`
+- 相关代码或文档改动
 
 ---
 
-## 3. 配置 GitHub Pages
+## 3. 当前更新元数据格式
 
-仓库已经提供了自动部署 Pages 的工作流：
+现在 `version.json` 至少应包含：
+
+```json
+{
+  "version": "1.2.5",
+  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.5.zip",
+  "sha256": "zip 文件的 sha256 小写十六进制",
+  "releaseNotes": "更新说明",
+  "isForced": false
+}
+```
+
+说明：
+
+- `downloadUrl`：给客户端下载更新包
+- `sha256`：客户端下载完成后校验完整性
+- 如果 `sha256` 缺失，当前客户端会默认拒绝自动安装
+
+这是故意的“安全失败”策略。
+
+---
+
+## 4. 自定义域名与缓存
+
+当前推荐更新源：
+
+- `https://xiimax.top/version.json`
+- `https://xiimax.top/downloads/...`
+
+如果你使用 Cloudflare：
+
+- `version.json` 建议短缓存或绕过缓存
+- ZIP 包和 `*.sha256.txt` 可以正常缓存
+
+---
+
+## 5. Pages / 静态页
+
+仓库已经有自动部署 Pages 的工作流：
 
 - `.github/workflows/deploy-pages.yml`
 
-Pages 站点默认会发布这些文件：
+当前静态站点会发布：
 
 - `index.html`
 - `downloads/`
 - `version.json`
 - `CONTACT_AUTHOR_WX.txt`
 
-发布新版本前需要手动同步：
-
-1. 下载按钮对应版本的 ZIP 文件名
-2. 页面里的版本号文案
-3. GitHub 仓库入口链接
-
-首次启用时，请在 GitHub 仓库里完成这一步：
-
-1. 打开 `Settings` -> `Pages`
-2. 在 `Build and deployment` 下把 `Source` 设为 `GitHub Actions`
-
-默认访问地址：
-
-- `https://xiisep-max.github.io/Xii_CHAT/`
-
-页面内容已经包含：
-
-- 下载按钮
-- 使用说明
-- 微信兜底联系信息 `Xiiii-555`
+如果你希望把 `*.sha256.txt` 也公开下载，当前工作流已经会把 `downloads/*` 整体带上，不需要额外处理。
 
 ---
 
-## 4. 同步更新 version.json
+## 6. 用户侧更新行为
 
-如果应用内版本检查继续使用，请把 `version.json` 的 `downloadUrl` 指向 GitHub 仓库 `downloads/` 目录里的 ZIP 直链。
+用户在应用内点击“下载更新”后，当前流程会变成：
 
-示例：
-
-```json
-{
-  "version": "1.1.0",
-  "downloadUrl": "https://raw.githubusercontent.com/XiiSep-MAX/Xii_CHAT/main/downloads/Xii_Raw_Graph_Portable_v1.1.0.zip",
-  "releaseNotes": "便携版更新说明",
-  "isForced": false
-}
-```
+1. 拉取 `version.json`
+2. 下载 ZIP 包
+3. 校验 ZIP 的 `SHA-256`
+4. 只有校验通过，才进入自动安装
+5. 校验失败时，拒绝自动安装并提示错误
 
 ---
 
-## 5. 用户侧默认使用方式
+## 7. 兜底说明
 
-1. 下载 ZIP 包
-2. 完整解压
-3. 直接双击 `ai_chat_app.exe`
-4. 按 `USER_SETUP_GUIDE.md` 配置 API Key
-
----
-
-## 6. 兜底方案
-
-如果 GitHub 页面或下载链接异常，请保留这句说明：
+建议继续保留下载异常兜底联系方式，例如：
 
 ```text
-下载异常请联系作者微信：Xiiii-555
+下载异常请联系作者微信：123456
 ```
 
-推荐同步放置的位置：
+推荐保留位置：
 
-- GitHub Pages 页面
-- GitHub Releases 发布说明
+- 下载页
 - `CONTACT_AUTHOR_WX.txt`
-- 用户压缩包内说明文档
+- 发布说明
 
 ---
 
-## 7. 当前策略说明
+## 8. 当前发布策略
 
-当前默认主线已经切换为：
+当前默认正式发布路径就是：
 
 - `ZIP 便携版`
-- `GitHub 仓库下载`
-- `GitHub Pages`
+- `xiimax.top` 下载入口
+- `version.json + sha256` 自动更新校验
 
-当前只保留 `ZIP / EXE 便携版` 发布路径。
+这已经比“只放 ZIP 直链”更接近可商用分发标准。

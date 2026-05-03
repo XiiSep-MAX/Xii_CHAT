@@ -43,3 +43,7 @@ release/
 .DS_Store
 **/GeneratedPluginRegistrant.java
 _publish_tmp/
+
+# Worker local state and dependencies
+worker/node_modules/
+worker/.wrangler/
