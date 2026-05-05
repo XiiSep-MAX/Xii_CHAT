@@ -881,6 +881,10 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
       mimeType?: string;
       bytesBase64?: string;
     } | null;
+    referenceImages?: Array<{
+      mimeType?: string;
+      bytesBase64?: string;
+    }> | null;
   };
 
   const installId = (body.installId ?? "").trim();
@@ -889,20 +893,25 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
     return json({ error: "缺少必要请求参数。" }, 400);
   }
 
+  const referenceImages = normalizeReferenceImages(
+    body.referenceImages,
+    body.referenceImage,
+  );
   const installIdHash = await sha256Hex(installId);
   const safetyResult = evaluateSafety({
     prompt,
-    hasReferenceImage: body.referenceImage != null,
+    hasReferenceImage: referenceImages.length > 0,
   });
   if (!safetyResult.allowed) {
     await appendSafetyEvent(env, {
       category: "generation_blocked",
       safetyCode: safetyResult.code,
       prompt: prompt,
-      hasReferenceImage: body.referenceImage != null,
+      hasReferenceImage: referenceImages.length > 0,
       installIdHash,
       payload: {
         aspectRatio: body.aspectRatio ?? null,
+        referenceImageCount: referenceImages.length,
       },
     });
     return json(
@@ -935,7 +944,7 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
     messages: [
       {
         role: "user",
-        content: buildMessageContent(prompt, body.referenceImage ?? null),
+        content: buildMessageContent(prompt, referenceImages),
       },
     ],
     temperature: 0.8,
@@ -1007,24 +1016,50 @@ function evaluateSafety(input: {
 
 function buildMessageContent(
   prompt: string,
-  referenceImage: {
+  referenceImages: Array<{
     mimeType?: string;
     bytesBase64?: string;
-  } | null,
+  }>,
 ) {
-  if (!referenceImage?.bytesBase64 || !referenceImage.mimeType) {
+  const validImages = referenceImages.filter(
+    (image) => image?.bytesBase64 && image?.mimeType,
+  );
+
+  if (validImages.length === 0) {
     return prompt;
   }
 
   return [
     { type: "text", text: prompt },
-    {
+    ...validImages.map((image) => ({
       type: "image_url",
       image_url: {
-        url: `data:${referenceImage.mimeType};base64,${referenceImage.bytesBase64}`,
+        url: `data:${image.mimeType};base64,${image.bytesBase64}`,
       },
-    },
+    })),
   ];
+}
+
+function normalizeReferenceImages(
+  referenceImages: Array<{
+    mimeType?: string;
+    bytesBase64?: string;
+  }> | null | undefined,
+  referenceImage: {
+    mimeType?: string;
+    bytesBase64?: string;
+  } | null | undefined,
+) {
+  const items = Array.isArray(referenceImages)
+    ? referenceImages
+    : referenceImage
+      ? [referenceImage]
+      : [];
+
+  return items.filter(
+    (image) =>
+      Boolean(image?.mimeType?.trim()) && Boolean(image?.bytesBase64?.trim()),
+  );
 }
 
 async function loadLicenseByHash(env: Env, codeHash: string) {

@@ -62,13 +62,13 @@ class OpenAIChatService {
   Future<ChatResponse> sendMessage({
     required String prompt,
     required ImageGenerationOptions options,
-    ChatImageAttachment? imageAttachment,
+    List<ChatImageAttachment> imageAttachments = const [],
   }) async {
     final normalizedOptions = options.normalized();
     final composedPrompt = _composePrompt(
       prompt: prompt,
       options: normalizedOptions,
-      hasReferenceImage: imageAttachment != null,
+      hasReferenceImage: imageAttachments.isNotEmpty,
     );
 
     final workerBaseUrl = _workerBaseUrl;
@@ -78,7 +78,7 @@ class OpenAIChatService {
         prompt: prompt,
         composedPrompt: composedPrompt,
         options: normalizedOptions,
-        imageAttachment: imageAttachment,
+        imageAttachments: imageAttachments,
       );
     }
 
@@ -99,7 +99,7 @@ class OpenAIChatService {
             'role': 'user',
             'content': _buildMessageContent(
               prompt: composedPrompt,
-              imageAttachment: imageAttachment,
+              imageAttachments: imageAttachments,
             ),
           },
         ],
@@ -120,7 +120,7 @@ class OpenAIChatService {
     return _parseResponseContent(
       content,
       options: normalizedOptions,
-      isEditRequest: imageAttachment != null,
+      isEditRequest: imageAttachments.isNotEmpty,
     );
   }
 
@@ -129,7 +129,7 @@ class OpenAIChatService {
     required String prompt,
     required String composedPrompt,
     required ImageGenerationOptions options,
-    required ChatImageAttachment? imageAttachment,
+    required List<ChatImageAttachment> imageAttachments,
   }) async {
     final licenseStatus = await LicenseService.instance.initialize();
     final response = await http.post(
@@ -143,13 +143,15 @@ class OpenAIChatService {
         'prompt': prompt,
         'composedPrompt': composedPrompt,
         'aspectRatio': options.aspectRatio,
-        'referenceImage': imageAttachment == null
-            ? null
-            : {
-                'name': imageAttachment.name,
-                'mimeType': imageAttachment.mimeType,
-                'bytesBase64': base64Encode(imageAttachment.bytes),
+        'referenceImages': imageAttachments
+            .map(
+              (image) => {
+                'name': image.name,
+                'mimeType': image.mimeType,
+                'bytesBase64': base64Encode(image.bytes),
               },
+            )
+            .toList(growable: false),
       }),
     );
 
@@ -162,7 +164,7 @@ class OpenAIChatService {
     return _parseResponseContent(
       content,
       options: options,
-      isEditRequest: imageAttachment != null,
+      isEditRequest: imageAttachments.isNotEmpty,
     );
   }
 
@@ -182,20 +184,22 @@ class OpenAIChatService {
 
   Object _buildMessageContent({
     required String prompt,
-    ChatImageAttachment? imageAttachment,
+    List<ChatImageAttachment> imageAttachments = const [],
   }) {
-    if (imageAttachment == null) {
+    if (imageAttachments.isEmpty) {
       return prompt;
     }
 
-    return [
+    return <Map<String, Object>>[
       {'type': 'text', 'text': prompt},
-      {
-        'type': 'image_url',
-        'image_url': {
-          'url': _buildDataUrl(imageAttachment),
+      ...imageAttachments.map(
+        (attachment) => {
+          'type': 'image_url',
+          'image_url': {
+            'url': _buildDataUrl(attachment),
+          },
         },
-      },
+      ),
     ];
   }
 

@@ -1,11 +1,11 @@
 {
-  "version": "1.2.7",
-  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.7.zip",
+  "version": "1.2.8",
+  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.8.zip",
   "mirrorUrls": [
-    "https://github.com/XiiSep-MAX/Xii_CHAT/releases/download/v1.2.7/Xii_Raw_Graph_Trial_v1.2.7.zip"
+    "https://github.com/XiiSep-MAX/Xii_CHAT/releases/download/v1.2.8/Xii_Raw_Graph_Trial_v1.2.8.zip"
   ],
-  "sha256": "d70b6e3c7cb26724ead5779880f77c7e8de50154ad6e4d223a21f7a9ce91fc0b",
-  "releaseNotes": "⚡ 更新下载优化版 1.2.7\n\n本次更新包含：\n- 自动更新支持主下载源失败后的备用镜像回退\n- 保持版本元数据签名与安装包完整性校验\n- 同步最新界面与下载流程调整",
+  "sha256": "af17afc9fa0a1be636bca965edad5a72787d12305bfc0850bcd8cdf5fd25ae0e",
+  "releaseNotes": "🖼️ 多图上传与发布收敛版 1.2.8\n\n本次更新包含：\n- 参考图上传改为支持多张图片\n- 已选图片改成横向缩略图并支持点击预览\n- 自动更新可安全清理旧版本安装包\n- 发布包移除多余技术文档与 MSIX 残留\n- 下载页增加备用镜像下载入口",
   "isForced": false,
-  "signature": "TTgHO1zAudyPvICXCanSXO0C7vJfXbFVlF29Mqp+e5x0BFoUk3MVzJKGXdl2PX7lwYw0pIPcyLLH55dvWVs1Aw=="
+  "signature": "RfOEWybej5/Atwm/lbyBjoRZC5WHllVkkvmYI107Z2HPgzrFR2LCDcXIinWS8NKtwGOmw90y10ILgYhcx71tAQ=="
 }

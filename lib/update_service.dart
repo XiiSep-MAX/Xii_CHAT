@@ -14,6 +14,7 @@ class UpdateService {
   static const String _versionCheckUrl = 'https://xiimax.top/version.json';
   static const String _versionMetadataPublicKeyBase64 =
       '1nB4xTxmJvKrjav06LtiBwTa6BUi57Z5hySt6RfYDvE=';
+  static const String _releasePackageFilePrefix = 'Xii_Raw_Graph_Trial_v';
   static const String _bundledUpdaterFileName = 'xii_updater.exe';
   static const List<String> _preservedInstallFiles = ['.env'];
   static const Duration _packageConnectTimeout = Duration(seconds: 20);
@@ -111,6 +112,7 @@ class UpdateService {
                 );
 
                 await _launchAutomaticZipUpdate(localPackage: localPackage);
+                unawaited(_cleanupLegacyDownloadedPackages(localPackage));
                 return const UpdateInstallResult.autoRestart(
                   '更新包已下载完成，应用将自动关闭并安装新版本。',
                 );
@@ -325,6 +327,57 @@ class UpdateService {
       lastError ?? Exception('下载失败：未知错误'),
       lastStackTrace ?? StackTrace.current,
     );
+  }
+
+  static Future<void> _cleanupLegacyDownloadedPackages(
+    File currentPackage,
+  ) async {
+    try {
+      final downloadsDir = currentPackage.parent;
+      if (!await downloadsDir.exists()) {
+        return;
+      }
+
+      final normalizedCurrentPath =
+          path.normalize(currentPackage.absolute.path).toLowerCase();
+
+      await for (final entity in downloadsDir.list(followLinks: false)) {
+        if (entity is! File) {
+          continue;
+        }
+
+        final fileName = path.basename(entity.path);
+        if (!_isManagedReleaseArtifact(fileName)) {
+          continue;
+        }
+
+        final normalizedCandidate =
+            path.normalize(entity.absolute.path).toLowerCase();
+        if (normalizedCandidate == normalizedCurrentPath) {
+          continue;
+        }
+
+        try {
+          await entity.delete();
+        } catch (error) {
+          stderr.writeln('清理旧安装包失败 (${entity.path}): $error');
+        }
+      }
+    } catch (error) {
+      stderr.writeln('清理旧安装包时出现异常: $error');
+    }
+  }
+
+  static bool _isManagedReleaseArtifact(String fileName) {
+    final lowerName = fileName.toLowerCase();
+    final lowerPrefix = _releasePackageFilePrefix.toLowerCase();
+    if (!lowerName.startsWith(lowerPrefix)) {
+      return false;
+    }
+
+    return lowerName.endsWith('.zip') ||
+        lowerName.endsWith('.exe') ||
+        lowerName.endsWith('.sha256.txt');
   }
 
   static Future<File> _downloadPortablePackageAttempt({

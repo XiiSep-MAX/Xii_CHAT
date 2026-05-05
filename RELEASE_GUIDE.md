@@ -5,7 +5,7 @@
 - 打包成 `Windows 便携 ZIP`
 - ZIP 放到仓库 `downloads/`
 - 页面与更新元数据通过 `xiimax.top`
-- `version.json` 提供 `downloadUrl + sha256`
+- `version.json` 提供 `downloadUrl + mirrorUrls + sha256`
 - 客户端下载后先校验 `SHA-256`，校验通过才允许自动安装
 
 ---
@@ -66,7 +66,8 @@ build_release.bat
 
 说明：
 
-- `downloadUrl`：给客户端下载更新包
+- `downloadUrl`：主下载源，给客户端下载更新包
+- `mirrorUrls`：备用下载源，主源过慢或失败时自动回退
 - `sha256`：客户端下载完成后校验完整性
 - 如果 `sha256` 缺失，当前客户端会默认拒绝自动安装
 

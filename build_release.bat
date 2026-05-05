@@ -5,7 +5,7 @@ cd /d "%~dp0"
 
 set "POWERSHELL_EXE=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
 set "OUTPUT_ROOT=release\READY_TO_SEND\Portable_ZIP"
-set "APP_VERSION=1.2.7"
+set "APP_VERSION=1.2.8"
 set "PACKAGE_PREFIX=Xii_Raw_Graph_Trial"
 set "DOWNLOADS_DIR=downloads"
 set "HASH_OUTPUT=release\READY_TO_SEND\package_sha256.txt"
@@ -46,13 +46,17 @@ if exist "build\windows\x64\runner\Release\.env" (
   echo [INFO] Removing stale .env from build output...
   del /f /q "build\windows\x64\runner\Release\.env"
 )
+if exist "build\windows\x64\runner\Release\*.msix" (
+  echo [INFO] Removing stale .msix from build output...
+  del /f /q "build\windows\x64\runner\Release\*.msix"
+)
 
 if exist "%OUTPUT_ROOT%" rmdir /s /q "%OUTPUT_ROOT%"
 mkdir "%OUTPUT_ROOT%"
 
 echo 3. Copying portable runtime files...
-xcopy /e /i /y "build\windows\x64\runner\Release\*" "%OUTPUT_ROOT%\" >nul
-if errorlevel 1 (
+robocopy "build\windows\x64\runner\Release" "%OUTPUT_ROOT%" /E /NFL /NDL /NJH /NJS /NC /NS /XF *.msix >nul
+if errorlevel 8 (
   echo [ERROR] Failed to copy the Windows release files.
   exit /b 1
 )
@@ -60,10 +64,14 @@ if errorlevel 1 (
 copy /y "USER_SETUP_GUIDE.md" "%OUTPUT_ROOT%\" >nul
 copy /y "PORTABLE_PACKAGE_README.md" "%OUTPUT_ROOT%\" >nul
 copy /y "CONTACT_AUTHOR_WX.txt" "%OUTPUT_ROOT%\" >nul
+copy /y "RELEASE_PACKAGE_README.txt" "%OUTPUT_ROOT%\" >nul
+
+if exist "%OUTPUT_ROOT%\USER_SETUP_GUIDE.md" del /f /q "%OUTPUT_ROOT%\USER_SETUP_GUIDE.md"
+if exist "%OUTPUT_ROOT%\PORTABLE_PACKAGE_README.md" del /f /q "%OUTPUT_ROOT%\PORTABLE_PACKAGE_README.md"
 
 if exist "%OUTPUT_ROOT%\.env" del /f /q "%OUTPUT_ROOT%\.env"
 if exist ".env.example" (
-  copy /y ".env.example" "%OUTPUT_ROOT%\.env.example" >nul
+  copy /y ".env.example" "%OUTPUT_ROOT%\.env" >nul
 )
 
 echo 4. Creating ZIP archive...

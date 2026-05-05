@@ -172,7 +172,7 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  static const String _appVersion = '1.2.7';
+  static const String _appVersion = '1.2.8';
   static const String _privacyAcknowledgedKey = 'privacy_acknowledged_v1';
   static const String _retainReferenceImagesKey = 'retain_reference_images_v1';
   static const String _contactWechatId = '123456';
@@ -231,7 +231,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   ChatSessionInfo? _activeSession;
   LicenseStatus? _licenseStatus;
-  ChatImageAttachment? _selectedImageAttachment;
+  final List<ChatImageAttachment> _selectedImageAttachments = [];
   ImageGenerationOptions _generationOptions = ImageGenerationOptions.defaults();
   bool _retainReferenceImagesLocally = true;
   bool _isSending = false;
@@ -758,7 +758,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _sessionSwitchLogs
           ..clear()
           ..addAll(switchLogs);
-        _selectedImageAttachment = null;
+        _selectedImageAttachments.clear();
         _controller.clear();
       });
       _showSnackBar('本地数据已清空。');
@@ -1035,7 +1035,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _sessionSwitchLogs
           ..clear()
           ..addAll(switchLogs);
-        _selectedImageAttachment = null;
+        _selectedImageAttachments.clear();
       });
       _scrollToBottom();
     } catch (e) {
@@ -1072,7 +1072,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ..clear()
           ..addAll(switchLogs);
         _controller.clear();
-        _selectedImageAttachment = null;
+        _selectedImageAttachments.clear();
       });
     } catch (e) {
       if (!mounted) return;
@@ -1215,7 +1215,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages
           ..clear()
           ..addAll(messages);
-        _selectedImageAttachment = null;
+        _selectedImageAttachments.clear();
       });
       _showSnackBar('会话已删除。');
     } catch (e) {
@@ -1373,33 +1373,55 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.image,
-        allowMultiple: false,
+        allowMultiple: true,
         withData: true,
       );
       if (result == null || result.files.isEmpty) return;
 
-      final file = result.files.single;
-      final bytes = file.bytes;
-      if (bytes == null || bytes.isEmpty) {
+      final pickedImages = <ChatImageAttachment>[];
+      final skippedFiles = <String>[];
+      for (final file in result.files) {
+        final bytes = file.bytes;
+        if (bytes == null || bytes.isEmpty) {
+          skippedFiles.add(file.name);
+          continue;
+        }
+        pickedImages.add(
+          ChatImageAttachment(
+            bytes: bytes,
+            name: file.name,
+            mimeType: _resolveMimeType(file.name),
+          ),
+        );
+      }
+      if (pickedImages.isEmpty) {
         _showSnackBar('暂时无法读取所选图片，请更换一张后重试。');
         return;
       }
-
       setState(() {
-        _selectedImageAttachment = ChatImageAttachment(
-          bytes: bytes,
-          name: file.name,
-          mimeType: _resolveMimeType(file.name),
-        );
+        final existingKeys = _selectedImageAttachments
+            .map((image) => '${image.name}|${image.bytes.length}')
+            .toSet();
+        for (final image in pickedImages) {
+          final key = '${image.name}|${image.bytes.length}';
+          if (existingKeys.add(key)) {
+            _selectedImageAttachments.add(image);
+          }
+        }
       });
+      if (skippedFiles.isNotEmpty) {
+        _showSnackBar('有 ${skippedFiles.length} 张图片读取失败，已跳过。');
+      }
     } catch (e) {
       _showSnackBar('选择图片失败：$e');
     }
   }
 
-  void _removeSelectedImage() {
+  void _removeSelectedImageAt(int index) {
     setState(() {
-      _selectedImageAttachment = null;
+      if (index >= 0 && index < _selectedImageAttachments.length) {
+        _selectedImageAttachments.removeAt(index);
+      }
     });
   }
 
@@ -1410,6 +1432,28 @@ class _ChatScreenState extends State<ChatScreen> {
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(content: Text(message)),
+    );
+  }
+
+  void _showImagePreview(BuildContext context, Widget image) {
+    showGeneralDialog<void>(
+      context: context,
+      barrierLabel: '关闭图片预览',
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.9),
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return _ImagePreviewDialog(image: image);
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOut,
+          ),
+          child: child,
+        );
+      },
     );
   }
 
@@ -1443,15 +1487,16 @@ class _ChatScreenState extends State<ChatScreen> {
     final activeSession = _activeSession;
     var licenseStatus = _licenseStatus ?? await _licenseService.initialize();
     final text = _controller.text.trim();
-    final imageAttachment = _selectedImageAttachment;
+    final imageAttachments =
+        List<ChatImageAttachment>.from(_selectedImageAttachments);
     final requestOptions = _generationOptions.normalized();
-    if (activeSession == null || (text.isEmpty && imageAttachment == null)) {
+    if (activeSession == null || (text.isEmpty && imageAttachments.isEmpty)) {
       return;
     }
 
     final localSafetyMessage = _evaluateLocalSafety(
       text: text,
-      hasReferenceImage: imageAttachment != null,
+      hasReferenceImage: imageAttachments.isNotEmpty,
     );
     if (localSafetyMessage != null) {
       _showSnackBar(localSafetyMessage);
@@ -1469,9 +1514,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final userMessage = ChatMessage(
       text: text,
       role: Role.user,
-      localImages: imageAttachment == null
-          ? const []
-          : (_retainReferenceImagesLocally ? [imageAttachment] : const []),
+      localImages: _retainReferenceImagesLocally ? imageAttachments : const [],
       generationOptions: requestOptions,
     );
 
@@ -1499,7 +1542,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _activeSession = refreshedActiveSession;
         _isSending = true;
         _controller.clear();
-        _selectedImageAttachment = null;
+        _selectedImageAttachments.clear();
       });
       _scrollToBottom();
     } catch (e) {
@@ -1512,7 +1555,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final response = await _chatService.sendMessage(
         prompt: text,
         options: requestOptions,
-        imageAttachment: imageAttachment,
+        imageAttachments: imageAttachments,
       );
       if (!licenseStatus.isPremium) {
         licenseStatus = await _licenseService.consumeTrialUse();
@@ -2020,10 +2063,21 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (_selectedImageAttachment != null) ...[
+              if (_selectedImageAttachments.isNotEmpty) ...[
                 _ComposerImagePreview(
-                  attachment: _selectedImageAttachment!,
-                  onRemove: _isSending ? null : _removeSelectedImage,
+                  attachments: _selectedImageAttachments,
+                  onRemoveAt: _isSending ? null : _removeSelectedImageAt,
+                  onPreviewAt: (index) {
+                    final attachment = _selectedImageAttachments[index];
+                    _showImagePreview(
+                      context,
+                      Image.memory(
+                        attachment.bytes,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 10),
               ],
@@ -2033,7 +2087,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: _selectedImageAttachment == null
+                      color: _selectedImageAttachments.isEmpty
                           ? Colors.white.withValues(alpha: 0.82)
                           : Theme.of(context)
                               .colorScheme
@@ -2052,9 +2106,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       onPressed: _isSending || _activeSession == null
                           ? null
                           : _pickImage,
-                      tooltip: '选择图片',
+                      tooltip: '选择图片（可多选）',
                       icon: Icon(
-                        _selectedImageAttachment == null
+                        _selectedImageAttachments.isEmpty
                             ? Icons.add_photo_alternate_outlined
                             : Icons.image_rounded,
                         color: Theme.of(context).colorScheme.primary,
@@ -2085,9 +2139,9 @@ class _ChatScreenState extends State<ChatScreen> {
                             (licenseStatus?.canUseGeneration ?? true),
                         maxLines: null,
                         decoration: InputDecoration(
-                          hintText: _selectedImageAttachment == null
+                          hintText: _selectedImageAttachments.isEmpty
                               ? '输入图片描述，例如：电影感海边日落、暖色调、超细节'
-                              : '输入描述，结合参考图一起生成...',
+                              : '输入描述，结合所选多张参考图一起生成...',
                           hintStyle: TextStyle(
                             color: Theme.of(context)
                                 .colorScheme
@@ -3466,12 +3520,14 @@ class _ImageDownloadActionState extends State<_ImageDownloadAction> {
 }
 
 class _ComposerImagePreview extends StatelessWidget {
-  final ChatImageAttachment attachment;
-  final VoidCallback? onRemove;
+  final List<ChatImageAttachment> attachments;
+  final void Function(int index)? onRemoveAt;
+  final void Function(int index)? onPreviewAt;
 
   const _ComposerImagePreview({
-    required this.attachment,
-    this.onRemove,
+    required this.attachments,
+    this.onRemoveAt,
+    this.onPreviewAt,
   });
 
   @override
@@ -3486,47 +3542,135 @@ class _ComposerImagePreview extends StatelessWidget {
           width: 1,
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: Image.memory(
-              attachment.bytes,
-              width: 64,
-              height: 64,
-              fit: BoxFit.cover,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '已选择参考图',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
+          Row(
+            children: [
+              Text(
+                '已选择参考图（${attachments.length} 张）',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w600,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  attachment.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    height: 1.35,
-                  ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '左右滑动可查看',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          IconButton(
-            onPressed: onRemove,
-            tooltip: '移除图片',
-            icon: const Icon(Icons.close_rounded),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 146,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: attachments.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final attachment = attachments[index];
+                return SizedBox(
+                  width: 96,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Stack(
+                        children: [
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: onPreviewAt == null
+                                  ? null
+                                  : () => onPreviewAt!(index),
+                              borderRadius: BorderRadius.circular(14),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: Stack(
+                                  children: [
+                                    Image.memory(
+                                      attachment.bytes,
+                                      width: 96,
+                                      height: 96,
+                                      fit: BoxFit.cover,
+                                    ),
+                                    if (onPreviewAt != null)
+                                      Positioned(
+                                        right: 6,
+                                        bottom: 6,
+                                        child: IgnorePointer(
+                                          child: DecoratedBox(
+                                            decoration: BoxDecoration(
+                                              color: Colors.black.withValues(
+                                                alpha: 0.54,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                            ),
+                                            child: const Padding(
+                                              padding: EdgeInsets.all(6),
+                                              child: Icon(
+                                                Icons.open_in_full_rounded,
+                                                color: Colors.white,
+                                                size: 14,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.56),
+                                shape: BoxShape.circle,
+                              ),
+                              child: IconButton(
+                                onPressed: onRemoveAt == null
+                                    ? null
+                                    : () => onRemoveAt!(index),
+                                tooltip: '移除图片',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 28,
+                                  minHeight: 28,
+                                ),
+                                icon: const Icon(
+                                  Icons.close_rounded,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        attachment.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),

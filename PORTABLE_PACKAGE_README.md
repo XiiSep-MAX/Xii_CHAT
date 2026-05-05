@@ -10,8 +10,8 @@
 2. 解压后直接双击 `ai_chat_app.exe`
 
 3. 首次使用时配置 `OPENAI_API_KEY`
-   发布包内已自带安全的 `.env.example`，默认会连接授权与生成网关。
-   如果你要自定义接口，可以按 `USER_SETUP_GUIDE.md` 中的说明，把程序目录里的 `.env.example` 复制并重命名为 `.env` 后再修改。
+   发布包内已自带安全的 `.env`，默认会连接授权与生成网关。
+   如果你要自定义接口，可以按 `USER_SETUP_GUIDE.md` 中的说明，直接修改程序目录里的 `.env`。
 
 ## 更新方式
 
