@@ -1,11 +1,11 @@
 {
-  "version": "1.2.8",
-  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.8.zip",
+  "version": "1.2.9",
+  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.9.zip",
   "mirrorUrls": [
-    "https://github.com/XiiSep-MAX/Xii_CHAT/releases/download/v1.2.8/Xii_Raw_Graph_Trial_v1.2.8.zip"
+    "https://github.com/XiiSep-MAX/Xii_CHAT/releases/download/v1.2.9/Xii_Raw_Graph_Trial_v1.2.9.zip"
   ],
-  "sha256": "af17afc9fa0a1be636bca965edad5a72787d12305bfc0850bcd8cdf5fd25ae0e",
-  "releaseNotes": "🖼️ 多图上传与发布收敛版 1.2.8\n\n本次更新包含：\n- 参考图上传改为支持多张图片\n- 已选图片改成横向缩略图并支持点击预览\n- 自动更新可安全清理旧版本安装包\n- 发布包移除多余技术文档与 MSIX 残留\n- 下载页增加备用镜像下载入口",
+  "sha256": "a91523313b06751293aebcfe5046ca25ee5aaf4a6e5efb456903c14f5fce2a2f",
+  "releaseNotes": "🎨 1.2.9 前端与图生图增强版\n\n本次更新包含：\n- 整个主界面重新设计，更像大厂 AI 工作台\n- 对话区改成更接近 GPT 的左右布局\n- 右侧工作区与输入区自适应优化\n- 参考图上传改为支持多张图片\n- 图生图 generation 请求改为参考 base64 图像与提示词一起发送",
   "isForced": false,
-  "signature": "RfOEWybej5/Atwm/lbyBjoRZC5WHllVkkvmYI107Z2HPgzrFR2LCDcXIinWS8NKtwGOmw90y10ILgYhcx71tAQ=="
+  "signature": "P7kZbEOUBCXZCsQFq63WCnwYWdEM5smvID3Haxd1qYlcHS8MlhfGCoZPGfGJ5wytAoWUB8AjblursM3x4RTPCw=="
 }

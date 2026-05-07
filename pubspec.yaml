@@ -1,7 +1,7 @@
 name: ai_chat_app
 description: A simple Flutter AI chat app powered by OpenAI.
 publish_to: 'none'
-version: 1.2.8+10
+version: 1.2.9+11
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

@@ -9,13 +9,13 @@ set "APP_VERSION=1.2.8"
 set "PACKAGE_PREFIX=Xii_Raw_Graph_Trial"
 set "DOWNLOADS_DIR=downloads"
 set "HASH_OUTPUT=release\READY_TO_SEND\package_sha256.txt"
-set "HASH_PUBLIC_FILE=%DOWNLOADS_DIR%\%PACKAGE_PREFIX%_v%APP_VERSION%.sha256.txt"
 
 for /f "tokens=2 delims=:, " %%i in ('findstr /i "\"version\"" version.json') do (
   set "APP_VERSION=%%~i"
 )
 
 set "ZIP_OUTPUT=release\READY_TO_SEND\%PACKAGE_PREFIX%_v%APP_VERSION%.zip"
+set "HASH_PUBLIC_FILE=%DOWNLOADS_DIR%\%PACKAGE_PREFIX%_v%APP_VERSION%.sha256.txt"
 
 echo ==========================================
 echo Building portable ZIP package
