@@ -877,6 +877,8 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
     prompt?: string;
     composedPrompt?: string;
     aspectRatio?: string;
+    size?: string;
+    quality?: string;
     referenceImage?: {
       mimeType?: string;
       bytesBase64?: string;
@@ -887,30 +889,35 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
     }> | null;
   };
 
+  const referenceImages =
+    body.referenceImages?.filter((item) => item?.bytesBase64?.trim()) ??
+    (body.referenceImage?.bytesBase64?.trim() ? [body.referenceImage] : []);
+
   const installId = (body.installId ?? "").trim();
   const prompt = (body.composedPrompt ?? body.prompt ?? "").trim();
+  const requestSize =
+    body.size?.trim().toLowerCase() ||
+    mapAspectRatioToSize(body.aspectRatio);
+  const requestQuality = normalizeQuality(body.quality);
   if (!installId || !prompt) {
     return json({ error: "缺少必要请求参数。" }, 400);
   }
 
-  const referenceImages = normalizeReferenceImages(
-    body.referenceImages,
-    body.referenceImage,
-  );
   const installIdHash = await sha256Hex(installId);
   const safetyResult = evaluateSafety({
     prompt,
-    hasReferenceImage: referenceImages.length > 0,
+    hasReferenceImage: referenceImages.isNotEmpty,
   });
   if (!safetyResult.allowed) {
     await appendSafetyEvent(env, {
       category: "generation_blocked",
       safetyCode: safetyResult.code,
       prompt: prompt,
-      hasReferenceImage: referenceImages.length > 0,
+      hasReferenceImage: referenceImages.isNotEmpty,
       installIdHash,
       payload: {
-        aspectRatio: body.aspectRatio ?? null,
+        size: requestSize,
+        quality: requestQuality,
         referenceImageCount: referenceImages.length,
       },
     });
@@ -941,16 +948,23 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
 
   const upstreamBody = {
     model: env.UPSTREAM_MODEL || "gpt-image-2",
-    messages: [
-      {
-        role: "user",
-        content: buildMessageContent(prompt, referenceImages),
-      },
-    ],
-    temperature: 0.8,
+    prompt: prompt,
+    n: 1,
+    size: requestSize,
+    quality: requestQuality,
+    ...(referenceImages.length === 0
+      ? {}
+      : {
+          image: referenceImages.map(
+            (image) =>
+              `data:${image.mimeType ?? "image/png"};base64,${image.bytesBase64}`,
+          ),
+        }),
   };
 
-  const upstreamResponse = await fetch(env.UPSTREAM_BASE_URL, {
+  const upstreamUrl = resolveImageApiUrl(env.UPSTREAM_BASE_URL);
+
+  const upstreamResponse = await fetch(upstreamUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -962,19 +976,25 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
   const upstreamText = await upstreamResponse.text();
   const payloadJson = safeParseJson(upstreamText);
   if (!upstreamResponse.ok) {
+    const upstreamError = describeUpstreamError(
+      upstreamResponse.status,
+      payloadJson,
+      upstreamText,
+    );
     return json(
       {
-        error:
-          payloadJson?.error?.message ??
-          payloadJson?.message ??
-          `上游请求失败：HTTP ${upstreamResponse.status}`,
+        error: upstreamError.message,
+        upstreamStatus: upstreamResponse.status,
+        upstreamDetail: upstreamError.detail,
       },
       upstreamResponse.status,
     );
   }
 
   await appendEvent(env, license.id, "generate", {
-    aspectRatio: body.aspectRatio ?? null,
+    size: requestSize,
+    quality: requestQuality,
+    referenceImageCount: referenceImages.length,
   });
 
   return json({
@@ -1014,52 +1034,42 @@ function evaluateSafety(input: {
   };
 }
 
-function buildMessageContent(
-  prompt: string,
-  referenceImages: Array<{
-    mimeType?: string;
-    bytesBase64?: string;
-  }>,
-) {
-  const validImages = referenceImages.filter(
-    (image) => image?.bytesBase64 && image?.mimeType,
-  );
-
-  if (validImages.length === 0) {
-    return prompt;
+function resolveImageApiUrl(baseUrl: string) {
+  const trimmed = baseUrl.replace(/\/+$/, "");
+  if (trimmed.endsWith("/chat/completions")) {
+    const apiRoot = trimmed.slice(0, -"/chat/completions".length);
+    return `${apiRoot}/images/generations`;
   }
-
-  return [
-    { type: "text", text: prompt },
-    ...validImages.map((image) => ({
-      type: "image_url",
-      image_url: {
-        url: `data:${image.mimeType};base64,${image.bytesBase64}`,
-      },
-    })),
-  ];
+  if (trimmed.endsWith("/v1")) {
+    return `${trimmed}/images/generations`;
+  }
+  return `${trimmed}/v1/images/generations`;
 }
 
-function normalizeReferenceImages(
-  referenceImages: Array<{
-    mimeType?: string;
-    bytesBase64?: string;
-  }> | null | undefined,
-  referenceImage: {
-    mimeType?: string;
-    bytesBase64?: string;
-  } | null | undefined,
-) {
-  const items = Array.isArray(referenceImages)
-    ? referenceImages
-    : referenceImage
-      ? [referenceImage]
-      : [];
+function mapAspectRatioToSize(aspectRatio?: string | null) {
+  switch (aspectRatio?.trim()) {
+    case "1:1":
+      return "1024x1024";
+    case "3:2":
+    case "16:9":
+      return "1536x1024";
+    case "2:3":
+    case "9:16":
+      return "1024x1536";
+    default:
+      return "auto";
+  }
+}
 
-  return items.filter(
-    (image) =>
-      Boolean(image?.mimeType?.trim()) && Boolean(image?.bytesBase64?.trim()),
-  );
+function normalizeQuality(quality?: string | null) {
+  const trimmed = quality?.trim().toLowerCase();
+  if (!trimmed) {
+    return "auto";
+  }
+
+  return ["low", "medium", "high", "auto"].includes(trimmed)
+    ? trimmed
+    : "auto";
 }
 
 async function loadLicenseByHash(env: Env, codeHash: string) {
@@ -1514,6 +1524,54 @@ function safeParseJson(value: string) {
   } catch {
     return null;
   }
+}
+
+function describeUpstreamError(
+  status: number,
+  payloadJson: any,
+  rawText: string,
+) {
+  const primaryCandidates = [
+    payloadJson?.error?.message,
+    typeof payloadJson?.error === "string" ? payloadJson.error : null,
+    payloadJson?.message,
+    payloadJson?.detail,
+  ].filter((value) => typeof value === "string" && value.trim().length > 0) as string[];
+
+  const detailCandidates = [
+    payloadJson?.error?.type,
+    payloadJson?.error?.code,
+    payloadJson?.request_id,
+    payloadJson?.requestId,
+  ].filter((value) => typeof value === "string" && value.trim().length > 0) as string[];
+
+  let message = primaryCandidates[0] ?? `上游请求失败：HTTP ${status}`;
+  const normalizedMessage = message.trim().toLowerCase();
+  const detailParts = [...detailCandidates];
+
+  if (
+    normalizedMessage === "openai_error" ||
+    normalizedMessage === "packy_api_error" ||
+    normalizedMessage === "error"
+  ) {
+    message = `上游请求失败：HTTP ${status}`;
+  }
+
+  const rawSnippet = rawText.trim().replace(/\s+/g, " ").slice(0, 240);
+  if (
+    rawSnippet &&
+    rawSnippet.toLowerCase() !== normalizedMessage &&
+    !detailParts.includes(rawSnippet)
+  ) {
+    detailParts.push(rawSnippet);
+  }
+
+  const detail = detailParts.join(" | ");
+  if (detail.isNotEmpty) {
+    message = `${message} (${detail})`;
+  }
+
+  return { message, detail };
 }
 
 function generateLicenseCode() {

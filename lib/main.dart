@@ -26,34 +26,34 @@ class AIChatApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = ColorScheme(
       brightness: Brightness.light,
-      primary: const Color(0xFF1C4C4A),
+      primary: const Color(0xFF111827),
       onPrimary: Colors.white,
-      primaryContainer: const Color(0xFFD3E8E4),
-      onPrimaryContainer: const Color(0xFF10211F),
-      secondary: const Color(0xFF8C6C3C),
+      primaryContainer: const Color(0xFFE8EEF7),
+      onPrimaryContainer: const Color(0xFF0F172A),
+      secondary: const Color(0xFF2563EB),
       onSecondary: Colors.white,
-      secondaryContainer: const Color(0xFFEEDFC7),
-      onSecondaryContainer: const Color(0xFF2B2113),
-      tertiary: const Color(0xFF5D7385),
+      secondaryContainer: const Color(0xFFE8F0FF),
+      onSecondaryContainer: const Color(0xFF122B55),
+      tertiary: const Color(0xFF0F766E),
       onTertiary: Colors.white,
-      tertiaryContainer: const Color(0xFFD9E3EC),
-      onTertiaryContainer: const Color(0xFF1B2A34),
-      error: const Color(0xFFB9382A),
+      tertiaryContainer: const Color(0xFFD7F5EF),
+      onTertiaryContainer: const Color(0xFF103A37),
+      error: const Color(0xFFB42318),
       onError: Colors.white,
-      errorContainer: const Color(0xFFF9DBD6),
-      onErrorContainer: const Color(0xFF3C120D),
-      surface: const Color(0xFFF6F1E8),
-      onSurface: const Color(0xFF182224),
-      surfaceContainerHighest: const Color(0xFFE8E1D6),
-      onSurfaceVariant: const Color(0xFF5E6A6C),
-      outline: const Color(0xFFBEC6C4),
-      outlineVariant: const Color(0xFFD8DED9),
+      errorContainer: const Color(0xFFFEE4E2),
+      onErrorContainer: const Color(0xFF55160C),
+      surface: const Color(0xFFF8FAFC),
+      onSurface: const Color(0xFF0F172A),
+      surfaceContainerHighest: const Color(0xFFE2E8F0),
+      onSurfaceVariant: const Color(0xFF64748B),
+      outline: const Color(0xFFCBD5E1),
+      outlineVariant: const Color(0xFFE2E8F0),
       shadow: Colors.black,
       scrim: Colors.black,
-      inverseSurface: const Color(0xFF1D2628),
-      onInverseSurface: const Color(0xFFF4F0E8),
-      inversePrimary: const Color(0xFF9CC7C2),
-      surfaceTint: const Color(0xFF1C4C4A),
+      inverseSurface: const Color(0xFF0F172A),
+      onInverseSurface: const Color(0xFFF8FAFC),
+      inversePrimary: const Color(0xFFBFDBFE),
+      surfaceTint: const Color(0xFF111827),
     );
 
     return MaterialApp(
@@ -61,7 +61,7 @@ class AIChatApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: colorScheme,
         useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFEEE7DB),
+        scaffoldBackgroundColor: const Color(0xFFEEF2F7),
         fontFamily: 'Segoe UI',
         appBarTheme: AppBarTheme(
           backgroundColor: Colors.transparent,
@@ -71,24 +71,24 @@ class AIChatApp extends StatelessWidget {
           surfaceTintColor: Colors.transparent,
           titleTextStyle: TextStyle(
             color: colorScheme.onSurface,
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
           ),
         ),
         cardTheme: CardThemeData(
-          color: Colors.white.withValues(alpha: 0.88),
+          color: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(28),
           ),
         ),
         dividerTheme: DividerThemeData(
-          color: colorScheme.outline.withValues(alpha: 0.16),
+          color: colorScheme.outline.withValues(alpha: 0.3),
           space: 1,
           thickness: 1,
         ),
         snackBarTheme: SnackBarThemeData(
-          backgroundColor: const Color(0xFF1E2A2A),
+          backgroundColor: const Color(0xFF111827),
           contentTextStyle: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w500,
@@ -100,8 +100,8 @@ class AIChatApp extends StatelessWidget {
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            backgroundColor: colorScheme.primary,
-            foregroundColor: colorScheme.onPrimary,
+            backgroundColor: colorScheme.secondary,
+            foregroundColor: colorScheme.onSecondary,
             elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             shape: RoundedRectangleBorder(
@@ -117,7 +117,7 @@ class AIChatApp extends StatelessWidget {
             foregroundColor: colorScheme.onSurface,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             side: BorderSide(
-              color: colorScheme.outline.withValues(alpha: 0.22),
+              color: colorScheme.outline.withValues(alpha: 0.5),
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -137,23 +137,23 @@ class AIChatApp extends StatelessWidget {
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.86),
+          fillColor: Colors.white,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
             borderSide: BorderSide(
-              color: colorScheme.outline.withValues(alpha: 0.18),
+              color: colorScheme.outline.withValues(alpha: 0.5),
             ),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
             borderSide: BorderSide(
-              color: colorScheme.outline.withValues(alpha: 0.18),
+              color: colorScheme.outline.withValues(alpha: 0.5),
             ),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
             borderSide: BorderSide(
-              color: colorScheme.primary.withValues(alpha: 0.55),
+              color: colorScheme.secondary.withValues(alpha: 0.7),
               width: 1.4,
             ),
           ),
@@ -172,7 +172,7 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  static const String _appVersion = '1.2.8';
+  static const String _appVersion = '1.2.7';
   static const String _privacyAcknowledgedKey = 'privacy_acknowledged_v1';
   static const String _retainReferenceImagesKey = 'retain_reference_images_v1';
   static const String _contactWechatId = '123456';
@@ -1378,15 +1378,13 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       if (result == null || result.files.isEmpty) return;
 
-      final pickedImages = <ChatImageAttachment>[];
-      final skippedFiles = <String>[];
+      final attachments = <ChatImageAttachment>[];
       for (final file in result.files) {
         final bytes = file.bytes;
         if (bytes == null || bytes.isEmpty) {
-          skippedFiles.add(file.name);
           continue;
         }
-        pickedImages.add(
+        attachments.add(
           ChatImageAttachment(
             bytes: bytes,
             name: file.name,
@@ -1394,24 +1392,17 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         );
       }
-      if (pickedImages.isEmpty) {
-        _showSnackBar('暂时无法读取所选图片，请更换一张后重试。');
+
+      if (attachments.isEmpty) {
+        _showSnackBar('暂时无法读取所选图片，请更换图片后重试。');
         return;
       }
+
       setState(() {
-        final existingKeys = _selectedImageAttachments
-            .map((image) => '${image.name}|${image.bytes.length}')
-            .toSet();
-        for (final image in pickedImages) {
-          final key = '${image.name}|${image.bytes.length}';
-          if (existingKeys.add(key)) {
-            _selectedImageAttachments.add(image);
-          }
-        }
+        _selectedImageAttachments
+          ..clear()
+          ..addAll(attachments);
       });
-      if (skippedFiles.isNotEmpty) {
-        _showSnackBar('有 ${skippedFiles.length} 张图片读取失败，已跳过。');
-      }
     } catch (e) {
       _showSnackBar('选择图片失败：$e');
     }
@@ -1432,28 +1423,6 @@ class _ChatScreenState extends State<ChatScreen> {
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(content: Text(message)),
-    );
-  }
-
-  void _showImagePreview(BuildContext context, Widget image) {
-    showGeneralDialog<void>(
-      context: context,
-      barrierLabel: '关闭图片预览',
-      barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.9),
-      transitionDuration: const Duration(milliseconds: 220),
-      pageBuilder: (context, animation, secondaryAnimation) {
-        return _ImagePreviewDialog(image: image);
-      },
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        return FadeTransition(
-          opacity: CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOut,
-          ),
-          child: child,
-        );
-      },
     );
   }
 
@@ -1483,12 +1452,25 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _updateGenerationSize(String size) {
+    setState(() {
+      _generationOptions = _generationOptions.copyWith(size: size);
+    });
+  }
+
+  void _updateGenerationQuality(String quality) {
+    setState(() {
+      _generationOptions = _generationOptions.copyWith(quality: quality);
+    });
+  }
+
   Future<void> _handleSend() async {
     final activeSession = _activeSession;
     var licenseStatus = _licenseStatus ?? await _licenseService.initialize();
     final text = _controller.text.trim();
-    final imageAttachments =
-        List<ChatImageAttachment>.from(_selectedImageAttachments);
+    final imageAttachments = List<ChatImageAttachment>.from(
+      _selectedImageAttachments,
+    );
     final requestOptions = _generationOptions.normalized();
     if (activeSession == null || (text.isEmpty && imageAttachments.isEmpty)) {
       return;
@@ -1514,7 +1496,9 @@ class _ChatScreenState extends State<ChatScreen> {
     final userMessage = ChatMessage(
       text: text,
       role: Role.user,
-      localImages: _retainReferenceImagesLocally ? imageAttachments : const [],
+      localImages: imageAttachments.isEmpty
+          ? const []
+          : (_retainReferenceImagesLocally ? imageAttachments : const []),
       generationOptions: requestOptions,
     );
 
@@ -1663,24 +1647,35 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isWideLayout = MediaQuery.of(context).size.width >= 1120;
+    final width = MediaQuery.of(context).size.width;
+    final isWideLayout = width >= 1120;
+    final appBarCompact = width < 980;
+    final workspacePadding = width < 960 ? 10.0 : 14.0;
+    final sidebarWidth = width >= 1360
+        ? 300.0
+        : width >= 1120
+            ? 270.0
+            : 0.0;
     final activeSession = _activeSession;
     final licenseStatus = _licenseStatus;
     final licenseBadgeLabel = licenseStatus?.badgeLabel ?? '授权读取中';
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
       drawer: isWideLayout
           ? null
           : Drawer(
               backgroundColor: Colors.transparent,
               surfaceTintColor: Colors.transparent,
-              width: 320,
+              width: 296,
               child: SafeArea(
-                minimum: const EdgeInsets.fromLTRB(16, 16, 0, 16),
+                minimum: EdgeInsets.fromLTRB(
+                    workspacePadding, workspacePadding, 0, workspacePadding),
                 child: _buildSessionPanel(closeDrawerOnAction: true),
               ),
             ),
       appBar: AppBar(
+        toolbarHeight: appBarCompact ? 66 : 72,
         leading: isWideLayout
             ? null
             : Builder(
@@ -1693,48 +1688,45 @@ class _ChatScreenState extends State<ChatScreen> {
         title: Row(
           children: [
             Container(
-              width: 38,
-              height: 38,
+              width: appBarCompact ? 38 : 42,
+              height: appBarCompact ? 38 : 42,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF1E4F4D),
-                    Color(0xFF7A6741),
-                  ],
-                ),
+                color: const Color(0xFF111827),
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF1E4F4D).withValues(alpha: 0.18),
-                    blurRadius: 14,
-                    offset: const Offset(0, 6),
+                    color: const Color(0xFF111827).withValues(alpha: 0.14),
+                    blurRadius: 18,
+                    offset: const Offset(0, 10),
                   ),
                 ],
               ),
               child: const Icon(
                 Icons.smart_toy,
                 color: Colors.white,
-                size: 21,
+                size: 20,
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: appBarCompact ? 10 : 12),
             Expanded(
-              child: Row(
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 10,
+                runSpacing: 6,
                 children: [
-                  Flexible(
+                  SizedBox(
+                    width: appBarCompact ? 220 : null,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text(
+                        Text(
                           'Xii_Raw Graph',
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontWeight: FontWeight.w800,
-                            fontSize: 19,
-                            letterSpacing: -0.2,
+                            fontSize: appBarCompact ? 18 : 20,
+                            letterSpacing: -0.3,
                           ),
                         ),
                         if (activeSession != null)
@@ -1751,27 +1743,26 @@ class _ChatScreenState extends State<ChatScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
-                      vertical: 6,
+                      vertical: 7,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.86),
+                      color: const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(999),
                       border: Border.all(
                         color: Theme.of(
                           context,
-                        ).colorScheme.outline.withValues(alpha: 0.16),
+                        ).colorScheme.outline.withValues(alpha: 0.4),
                       ),
                     ),
                     child: Text(
                       '$licenseBadgeLabel · v$_appVersion',
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -1780,58 +1771,107 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
-        backgroundColor: Theme.of(context).colorScheme.surface,
+        backgroundColor: Colors.white.withValues(alpha: 0.9),
         foregroundColor: Theme.of(context).colorScheme.onSurface,
         actions: [
-          IconButton(
-            icon: Icon(
-              Icons.privacy_tip_outlined,
-              color: Theme.of(context).colorScheme.primary,
+          if (appBarCompact) ...[
+            IconButton(
+              icon: Icon(
+                Icons.privacy_tip_outlined,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              tooltip: '数据与隐私',
+              onPressed: _isInitializing ? null : _showPrivacyAndDataSheet,
             ),
-            tooltip: '数据与隐私',
-            onPressed: _isInitializing ? null : _showPrivacyAndDataSheet,
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.verified_outlined,
-              color: Theme.of(context).colorScheme.primary,
+            IconButton(
+              icon: Icon(
+                Icons.verified_outlined,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              tooltip: '激活与授权',
+              onPressed: _isInitializing ? null : _showActivationDialog,
             ),
-            tooltip: '激活与授权',
-            onPressed: _isInitializing ? null : _showActivationDialog,
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.add_comment_rounded,
-              color: Theme.of(context).colorScheme.primary,
+            PopupMenuButton<String>(
+              tooltip: '更多操作',
+              onSelected: (value) async {
+                switch (value) {
+                  case 'new':
+                    await _createSession();
+                    break;
+                  case 'history':
+                    await _showGeneratedImageHistory();
+                    break;
+                  case 'switch_logs':
+                    await _showSessionSwitchLogs();
+                    break;
+                  case 'clear':
+                    await _clearMessages();
+                    break;
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(value: 'new', child: Text('新建会话')),
+                PopupMenuItem(value: 'history', child: Text('AI 生图历史')),
+                PopupMenuItem(value: 'switch_logs', child: Text('切换记录')),
+                PopupMenuItem(value: 'clear', child: Text('清空聊天')),
+              ],
+              icon: Icon(
+                Icons.more_horiz_rounded,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
-            tooltip: '新建会话',
-            onPressed: _isInitializing ? null : _createSession,
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.photo_library_outlined,
-              color: Theme.of(context).colorScheme.primary,
+          ] else ...[
+            IconButton(
+              icon: Icon(
+                Icons.privacy_tip_outlined,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              tooltip: '数据与隐私',
+              onPressed: _isInitializing ? null : _showPrivacyAndDataSheet,
             ),
-            tooltip: 'AI 生图历史',
-            onPressed: _isInitializing ? null : _showGeneratedImageHistory,
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.swap_horizontal_circle_outlined,
-              color: Theme.of(context).colorScheme.primary,
+            IconButton(
+              icon: Icon(
+                Icons.verified_outlined,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              tooltip: '激活与授权',
+              onPressed: _isInitializing ? null : _showActivationDialog,
             ),
-            tooltip: '切换记录',
-            onPressed: _isInitializing ? null : _showSessionSwitchLogs,
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.delete_sweep_rounded,
-              color: Theme.of(context).colorScheme.primary,
+            IconButton(
+              icon: Icon(
+                Icons.add_comment_rounded,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              tooltip: '新建会话',
+              onPressed: _isInitializing ? null : _createSession,
             ),
-            tooltip: '清空聊天',
-            onPressed:
-                _messages.isEmpty || _isInitializing ? null : _clearMessages,
-          ),
+            IconButton(
+              icon: Icon(
+                Icons.photo_library_outlined,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              tooltip: 'AI 生图历史',
+              onPressed: _isInitializing ? null : _showGeneratedImageHistory,
+            ),
+            IconButton(
+              icon: Icon(
+                Icons.swap_horizontal_circle_outlined,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              tooltip: '切换记录',
+              onPressed: _isInitializing ? null : _showSessionSwitchLogs,
+            ),
+            IconButton(
+              icon: Icon(
+                Icons.delete_sweep_rounded,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              tooltip: '清空聊天',
+              onPressed:
+                  _messages.isEmpty || _isInitializing ? null : _clearMessages,
+            ),
+          ],
+          const SizedBox(width: 8),
         ],
       ),
       body: SafeArea(
@@ -1865,29 +1905,40 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   if (isWideLayout)
                     SizedBox(
-                      width: 320,
+                      width: sidebarWidth,
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 18, 0, 18),
+                        padding: EdgeInsets.fromLTRB(
+                          workspacePadding,
+                          workspacePadding,
+                          0,
+                          workspacePadding,
+                        ),
                         child: _buildSessionPanel(closeDrawerOnAction: false),
                       ),
                     ),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                      padding: EdgeInsets.fromLTRB(
+                        workspacePadding,
+                        workspacePadding,
+                        workspacePadding,
+                        workspacePadding,
+                      ),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.82),
-                          borderRadius: BorderRadius.circular(30),
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(32),
                           border: Border.all(
                             color: Theme.of(
                               context,
-                            ).colorScheme.outline.withValues(alpha: 0.12),
+                            ).colorScheme.outline.withValues(alpha: 0.3),
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 32,
-                              offset: const Offset(0, 18),
+                              color: const Color(0xFF0F172A)
+                                  .withValues(alpha: 0.08),
+                              blurRadius: 38,
+                              offset: const Offset(0, 20),
                             ),
                           ],
                         ),
@@ -1904,104 +1955,39 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildChatWorkspace() {
     final activeSession = _activeSession;
     final licenseStatus = _licenseStatus;
+    final width = MediaQuery.of(context).size.width;
+    final contentMaxWidth = width < 980 ? double.infinity : 980.0;
+    final compactInput = width < 860;
 
     return Column(
       children: [
         if (activeSession != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: _WorkspaceStatusStrip(
-              session: activeSession,
-              licenseStatus: licenseStatus,
-              onRefresh: _refreshLicenseStatus,
-              onContactAuthor: _showAuthorContactDialog,
-              onActivate: _showActivationDialog,
-            ),
-          ),
-        if (_messages.isEmpty)
-          Container(
-            margin: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-            padding: const EdgeInsets.fromLTRB(26, 28, 26, 26),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.white.withValues(alpha: 0.96),
-                  const Color(0xFFF6EEE2),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: contentMaxWidth),
+                child: _WorkspaceStatusStrip(
+                  session: activeSession,
+                  licenseStatus: licenseStatus,
+                  onRefresh: _refreshLicenseStatus,
+                  onContactAuthor: _showAuthorContactDialog,
+                  onActivate: _showActivationDialog,
+                ),
               ),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outline.withValues(
-                      alpha: 0.12,
-                    ),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 18,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Container(
-                  width: 70,
-                  height: 70,
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primaryContainer.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Icon(
-                    Icons.auto_awesome_rounded,
-                    size: 34,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  activeSession == null
-                      ? (licenseStatus?.isPremium ?? false)
-                          ? '欢迎使用 Xii_Raw Graph 高级版'
-                          : '欢迎使用 Xii_Raw Graph 试用版'
-                      : '欢迎回到「${activeSession.title}」',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.4,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  licenseStatus?.summaryText ??
-                      '现在支持本地 SQLite 会话保存、多会话切换记录，以及 AI 生图历史回看。',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    height: 1.7,
-                  ),
-                ),
-              ],
             ),
           ),
         if (_isSending)
           Container(
-            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF0E7D8),
+              color: const Color(0xFFEEF4FF),
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
                 color: Theme.of(
                   context,
-                ).colorScheme.primary.withValues(alpha: 0.18),
+                ).colorScheme.secondary.withValues(alpha: 0.22),
                 width: 1,
               ),
             ),
@@ -2021,7 +2007,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 Text(
                   'AI 正在生成图片...',
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
+                    color: Theme.of(context).colorScheme.secondary,
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
                   ),
@@ -2030,207 +2016,317 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         Expanded(
-          child: ListView.builder(
-            controller: _scrollController,
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-            itemCount: _messages.length,
-            itemBuilder: (context, index) {
-              final message = _messages[index];
-              return AnimatedMessageBubble(
-                key: ValueKey(message.id ?? message.createdAt),
-                message: message,
-                isNew: index == _messages.length - 1 && !_isSending,
-              );
-            },
-          ),
+          child: _messages.isEmpty
+              ? LayoutBuilder(
+                  builder: (context, constraints) => SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: ConstrainedBox(
+                          constraints:
+                              BoxConstraints(maxWidth: contentMaxWidth),
+                          child: _EmptyWorkspaceHero(
+                            title: activeSession == null
+                                ? (licenseStatus?.isPremium ?? false)
+                                    ? '欢迎使用 Xii_Raw Graph 高级版'
+                                    : '欢迎使用 Xii_Raw Graph 试用版'
+                                : '欢迎回到「${activeSession.title}」',
+                            subtitle: licenseStatus?.summaryText ??
+                                '现在支持本地 SQLite 会话保存、多会话切换记录，以及 AI 生图历史回看。',
+                            sessionCount: _sessions.length,
+                            imageHistoryCount: _generatedImageHistory.length,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                  itemCount: _messages.length,
+                  itemBuilder: (context, index) {
+                    final message = _messages[index];
+                    return Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: contentMaxWidth),
+                        child: AnimatedMessageBubble(
+                          key: ValueKey(message.id ?? message.createdAt),
+                          message: message,
+                          isNew: index == _messages.length - 1 && !_isSending,
+                        ),
+                      ),
+                    );
+                  },
+                ),
         ),
         const Divider(height: 1),
         Container(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
           decoration: BoxDecoration(
-            color: const Color(0xFFF8F3EA),
+            color: const Color(0xFFF8FAFC),
             borderRadius: const BorderRadius.vertical(
-              bottom: Radius.circular(30),
+              bottom: Radius.circular(32),
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
+                color: Colors.black.withValues(alpha: 0.025),
                 blurRadius: 16,
                 offset: const Offset(0, -4),
               ),
             ],
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_selectedImageAttachments.isNotEmpty) ...[
-                _ComposerImagePreview(
-                  attachments: _selectedImageAttachments,
-                  onRemoveAt: _isSending ? null : _removeSelectedImageAt,
-                  onPreviewAt: (index) {
-                    final attachment = _selectedImageAttachments[index];
-                    _showImagePreview(
-                      context,
-                      Image.memory(
-                        attachment.bytes,
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.high,
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 10),
-              ],
-              Row(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: contentMaxWidth),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                     decoration: BoxDecoration(
-                      color: _selectedImageAttachments.isEmpty
-                          ? Colors.white.withValues(alpha: 0.82)
-                          : Theme.of(context)
-                              .colorScheme
-                              .primaryContainer
-                              .withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(24),
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(18),
                       border: Border.all(
                         color: Theme.of(context)
                             .colorScheme
                             .outline
-                            .withValues(alpha: 0.14),
-                        width: 1,
+                            .withValues(alpha: 0.35),
                       ),
                     ),
-                    child: IconButton(
-                      onPressed: _isSending || _activeSession == null
-                          ? null
-                          : _pickImage,
-                      tooltip: '选择图片（可多选）',
-                      icon: Icon(
-                        _selectedImageAttachments.isEmpty
-                            ? Icons.add_photo_alternate_outlined
-                            : Icons.image_rounded,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.84),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .outline
-                              .withValues(alpha: 0.14),
-                          width: 1,
-                        ),
-                      ),
-                      child: TextField(
-                        controller: _controller,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => _handleSend(),
-                        enabled: !_isSending &&
-                            !_isInitializing &&
-                            _activeSession != null &&
-                            (licenseStatus?.canUseGeneration ?? true),
-                        maxLines: null,
-                        decoration: InputDecoration(
-                          hintText: _selectedImageAttachments.isEmpty
-                              ? '输入图片描述，例如：电影感海边日落、暖色调、超细节'
-                              : '输入描述，结合所选多张参考图一起生成...',
-                          hintStyle: TextStyle(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant
-                                .withValues(alpha: 0.58),
-                          ),
-                          prefixIcon: Icon(
-                            Icons.chat_bubble_outline_rounded,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                        ),
-                      ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final compact = constraints.maxWidth < 620;
+                        final dropdownWidth = compact
+                            ? constraints.maxWidth
+                            : (constraints.maxWidth - 140).clamp(220, 520) / 2;
+
+                        return Wrap(
+                          spacing: 12,
+                          runSpacing: 10,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: compact ? constraints.maxWidth : 116,
+                              child: Text(
+                                '生成设置',
+                                style: TextStyle(
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            SizedBox(
+                              width: dropdownWidth.toDouble(),
+                              child: _GenerationOptionDropdown(
+                                label: '尺寸',
+                                value: _generationOptions.size,
+                                items: ImageGenerationOptions.availableSizes,
+                                onChanged:
+                                    _isSending ? null : _updateGenerationSize,
+                              ),
+                            ),
+                            SizedBox(
+                              width: dropdownWidth.toDouble(),
+                              child: _GenerationOptionDropdown(
+                                label: '质量',
+                                value: _generationOptions.quality,
+                                items:
+                                    ImageGenerationOptions.availableQualities,
+                                onChanged: _isSending
+                                    ? null
+                                    : _updateGenerationQuality,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: _isSending ? 48 : 80,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: _isSending
-                            ? [Colors.grey.shade400, Colors.grey.shade500]
-                            : const [Color(0xFF214F4C), Color(0xFF7B6842)],
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: (_isSending ? Colors.grey : Colors.blue)
-                              .withValues(alpha: 0.24),
-                          blurRadius: 12,
-                          offset: const Offset(0, 8),
+                  const SizedBox(height: 10),
+                  if (_selectedImageAttachments.isNotEmpty) ...[
+                    _ComposerImagePreview(
+                      attachments: _selectedImageAttachments,
+                      onRemoveAt: _isSending ? null : _removeSelectedImageAt,
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  if (compactInput) ...[
+                    Row(
+                      children: [
+                        _buildImagePickerButton(),
+                        const SizedBox(width: 10),
+                        Expanded(child: _buildComposerField(licenseStatus)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildSendButton(),
                         ),
                       ],
                     ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(24),
-                        onTap: _isSending || _activeSession == null
-                            ? null
-                            : _handleSend,
-                        child: Center(
-                          child: _isSending
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
-                                    ),
-                                  ),
-                                )
-                              : const Text(
-                                  '发送',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                  ] else
+                    Row(
+                      children: [
+                        _buildImagePickerButton(),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildComposerField(licenseStatus)),
+                        const SizedBox(width: 12),
+                        _buildSendButton(),
+                      ],
+                    ),
+                  if (licenseStatus != null && !licenseStatus.isPremium) ...[
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '目前\$0.08一张。',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
-              if (licenseStatus != null && !licenseStatus.isPremium) ...[
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    '目前\$0.08一张。',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
-            ],
+            ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildImagePickerButton() {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: _selectedImageAttachments.isEmpty
+            ? Colors.white
+            : Theme.of(context)
+                .colorScheme
+                .secondaryContainer
+                .withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.35),
+          width: 1,
+        ),
+      ),
+      child: IconButton(
+        onPressed: _isSending || _activeSession == null ? null : _pickImage,
+        tooltip: '选择图片',
+        icon: Icon(
+          _selectedImageAttachments.isEmpty
+              ? Icons.add_photo_alternate_outlined
+              : Icons.collections_rounded,
+          color: Theme.of(context).colorScheme.secondary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildComposerField(LicenseStatus? licenseStatus) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.35),
+          width: 1,
+        ),
+      ),
+      child: TextField(
+        controller: _controller,
+        textInputAction: TextInputAction.send,
+        onSubmitted: (_) => _handleSend(),
+        enabled: !_isSending &&
+            !_isInitializing &&
+            _activeSession != null &&
+            (licenseStatus?.canUseGeneration ?? true),
+        maxLines: null,
+        decoration: InputDecoration(
+          hintText: _selectedImageAttachments.isEmpty
+              ? '输入图片描述，例如：电影感海边日落、暖色调、超细节'
+              : '输入描述，结合参考图一起生成...',
+          hintStyle: TextStyle(
+            color: Theme.of(context)
+                .colorScheme
+                .onSurfaceVariant
+                .withValues(alpha: 0.72),
+          ),
+          prefixIcon: Icon(
+            Icons.chat_bubble_outline_rounded,
+            color: Theme.of(context).colorScheme.secondary,
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSendButton() {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: _isSending ? 48 : 80,
+      height: 48,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: _isSending
+              ? [Colors.grey.shade400, Colors.grey.shade500]
+              : const [Color(0xFF2563EB), Color(0xFF111827)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: (_isSending ? Colors.grey : const Color(0xFF2563EB))
+                .withValues(alpha: 0.24),
+            blurRadius: 12,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: _isSending || _activeSession == null ? null : _handleSend,
+          child: Center(
+            child: _isSending
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.white,
+                      ),
+                    ),
+                  )
+                : const Text(
+                    '发送',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -2327,22 +2423,31 @@ class _WorkspaceStatusStrip extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF4ECE0),
+        color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.35),
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.chat_bubble_outline_rounded,
-            color: Theme.of(context).colorScheme.primary,
-            size: 18,
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.secondaryContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.auto_awesome_rounded,
+              color: Theme.of(context).colorScheme.secondary,
+              size: 16,
+            ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2355,16 +2460,28 @@ class _WorkspaceStatusStrip extends StatelessWidget {
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurface,
                     fontWeight: FontWeight.w800,
-                    fontSize: 13.5,
+                    fontSize: 14,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Text(
-                  '消息 ${session.messageCount} 条 · 切换 ${session.switchCount} 次 · 最近 ${_formatTime(session.sortTime)}',
-                  maxLines: 1,
+                  '消息 ${session.messageCount} 条 · 切换 ${session.switchCount} 次',
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 11.5,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  '最近活跃 ${_formatTime(session.sortTime)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurfaceVariant
+                        .withValues(alpha: 0.9),
                     fontSize: 11.5,
                   ),
                 ),
@@ -2372,18 +2489,30 @@ class _WorkspaceStatusStrip extends StatelessWidget {
             ),
           ),
           if (status != null) ...[
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             TextButton(
               onPressed: onRefresh,
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, 36),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+              ),
               child: const Text('刷新'),
             ),
             FilledButton.tonal(
               onPressed: onContactAuthor,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 36),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
               child: const Text('联系作者'),
             ),
             FilledButton.tonal(
               onPressed: onActivate,
-              child: const Text('授权'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 36),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              child: const Text('授权中心'),
             ),
           ],
         ],
@@ -2427,76 +2556,119 @@ class _SessionSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.78),
-        borderRadius: BorderRadius.circular(28),
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(30),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+          color: Colors.white.withValues(alpha: 0.08),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.14),
+            blurRadius: 28,
+            offset: const Offset(0, 16),
           ),
         ],
       ),
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      width: 34,
-                      height: 34,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primaryContainer.withValues(alpha: 0.75),
+                        color: Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
                         Icons.layers_rounded,
-                        color: Theme.of(context).colorScheme.primary,
+                        color: Colors.white,
                         size: 18,
                       ),
                     ),
                     const SizedBox(width: 10),
-                    Text(
-                      '本地会话',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '本地会话',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${sessions.length} 个会话 · 自动本地保存',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.62),
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                ElevatedButton.icon(
-                  onPressed: isBusy ? null : onCreateSession,
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('新建对话'),
+                const SizedBox(height: 14),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Color(0xFF2563EB),
+                        Color(0xFF1D4ED8),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF2563EB).withValues(alpha: 0.3),
+                        blurRadius: 16,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: ElevatedButton.icon(
+                    onPressed: isBusy ? null : onCreateSession,
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('新建对话'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      minimumSize: const Size.fromHeight(44),
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton.icon(
+                      child: _SidebarQuickAction(
                         onPressed: onOpenImageHistory,
                         icon: const Icon(Icons.photo_library_outlined),
-                        label: const Text('生图历史'),
+                        label: '生图历史',
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: OutlinedButton.icon(
+                      child: _SidebarQuickAction(
                         onPressed: onOpenSwitchLogs,
                         icon: const Icon(Icons.swap_calls_outlined),
-                        label: const Text('切换记录'),
+                        label: '切换记录',
                       ),
                     ),
                   ],
@@ -2506,157 +2678,411 @@ class _SessionSidebar extends StatelessWidget {
           ),
           const Divider(height: 1),
           Expanded(
-            child: sessions.isEmpty
-                ? Center(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
                     child: Text(
-                      '暂无会话',
+                      '最近会话',
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: Colors.white.withValues(alpha: 0.58),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: sessions.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final session = sessions[index];
-                      final selected = session.id == activeSession?.id;
-                      return Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () => onSelectSession(session),
-                          borderRadius: BorderRadius.circular(18),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.all(15),
-                            decoration: BoxDecoration(
-                              color: selected
-                                  ? const Color(0xFFE8EFE9)
-                                  : const Color(0xFFF7F3EC),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: selected
-                                    ? Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withValues(alpha: 0.18)
-                                    : Theme.of(context)
-                                        .colorScheme
-                                        .outline
-                                        .withValues(alpha: 0.08),
+                  ),
+                  Expanded(
+                    child: sessions.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 18),
+                              child: Text(
+                                '还没有会话，点击上方“新建对话”开始第一条创作。',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.62),
+                                  height: 1.6,
+                                ),
                               ),
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        session.title,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: selected
-                                              ? Theme.of(context)
-                                                  .colorScheme
-                                                  .onPrimaryContainer
-                                              : Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface,
-                                          fontWeight: FontWeight.w800,
-                                        ),
+                          )
+                        : ListView.separated(
+                            padding: EdgeInsets.zero,
+                            itemCount: sessions.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (context, index) {
+                              final session = sessions[index];
+                              final selected = session.id == activeSession?.id;
+                              return Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () => onSelectSession(session),
+                                  borderRadius: BorderRadius.circular(18),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 180),
+                                    padding: const EdgeInsets.all(13),
+                                    decoration: BoxDecoration(
+                                      color: selected
+                                          ? Colors.white.withValues(alpha: 0.1)
+                                          : Colors.white
+                                              .withValues(alpha: 0.04),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: selected
+                                            ? Colors.white
+                                                .withValues(alpha: 0.18)
+                                            : Colors.white
+                                                .withValues(alpha: 0.05),
                                       ),
                                     ),
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        if (selected)
-                                          Icon(
-                                            Icons.radio_button_checked_rounded,
-                                            size: 16,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .primary,
-                                          ),
-                                        PopupMenuButton<String>(
-                                          tooltip: '会话操作',
-                                          onSelected: (value) {
-                                            switch (value) {
-                                              case 'rename':
-                                                onRenameSession(session);
-                                                break;
-                                              case 'delete':
-                                                onDeleteSession(session);
-                                                break;
-                                            }
-                                          },
-                                          itemBuilder: (context) => const [
-                                            PopupMenuItem<String>(
-                                              value: 'rename',
-                                              child: Text('重命名'),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                session.title,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: selected
+                                                      ? Colors.white
+                                                      : Colors.white.withValues(
+                                                          alpha: 0.92,
+                                                        ),
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
                                             ),
-                                            PopupMenuItem<String>(
-                                              value: 'delete',
-                                              child: Text('删除会话'),
+                                            const SizedBox(width: 8),
+                                            if (selected)
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 4,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(
+                                                    0xFF2563EB,
+                                                  ).withValues(alpha: 0.22),
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                    999,
+                                                  ),
+                                                ),
+                                                child: const Text(
+                                                  '当前',
+                                                  style: TextStyle(
+                                                    color: Color(0xFFBFDBFE),
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                              ),
+                                            PopupMenuButton<String>(
+                                              tooltip: '会话操作',
+                                              padding: EdgeInsets.zero,
+                                              onSelected: (value) {
+                                                switch (value) {
+                                                  case 'rename':
+                                                    onRenameSession(session);
+                                                    break;
+                                                  case 'delete':
+                                                    onDeleteSession(session);
+                                                    break;
+                                                }
+                                              },
+                                              itemBuilder: (context) => const [
+                                                PopupMenuItem<String>(
+                                                  value: 'rename',
+                                                  child: Text('重命名'),
+                                                ),
+                                                PopupMenuItem<String>(
+                                                  value: 'delete',
+                                                  child: Text('删除会话'),
+                                                ),
+                                              ],
+                                              icon: Icon(
+                                                Icons.more_horiz_rounded,
+                                                size: 18,
+                                                color: selected
+                                                    ? Colors.white
+                                                    : Colors.white.withValues(
+                                                        alpha: 0.68,
+                                                      ),
+                                              ),
                                             ),
                                           ],
-                                          icon: Icon(
-                                            Icons.more_horiz_rounded,
-                                            size: 18,
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          '消息 ${session.messageCount} 条 · 切换 ${session.switchCount} 次',
+                                          style: TextStyle(
                                             color: selected
-                                                ? Theme.of(context)
-                                                    .colorScheme
-                                                    .onPrimaryContainer
-                                                    .withValues(alpha: 0.8)
-                                                : Theme.of(context)
-                                                    .colorScheme
-                                                    .onSurfaceVariant,
+                                                ? Colors.white.withValues(
+                                                    alpha: 0.84,
+                                                  )
+                                                : Colors.white.withValues(
+                                                    alpha: 0.62,
+                                                  ),
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          '最近使用 ${_formatTime(session.sortTime)}',
+                                          style: TextStyle(
+                                            color: selected
+                                                ? Colors.white.withValues(
+                                                    alpha: 0.76,
+                                                  )
+                                                : Colors.white.withValues(
+                                                    alpha: 0.56,
+                                                  ),
+                                            fontSize: 12,
                                           ),
                                         ),
                                       ],
                                     ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  '消息 ${session.messageCount} 条 · 切换 ${session.switchCount} 次',
-                                  style: TextStyle(
-                                    color: selected
-                                        ? Theme.of(context)
-                                            .colorScheme
-                                            .onPrimaryContainer
-                                            .withValues(alpha: 0.85)
-                                        : Theme.of(context)
-                                            .colorScheme
-                                            .onSurfaceVariant,
-                                    fontSize: 12,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '最近使用 ${_formatTime(session.sortTime)}',
-                                  style: TextStyle(
-                                    color: selected
-                                        ? Theme.of(context)
-                                            .colorScheme
-                                            .onPrimaryContainer
-                                            .withValues(alpha: 0.78)
-                                        : Theme.of(context)
-                                            .colorScheme
-                                            .onSurfaceVariant,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              );
+                            },
                           ),
-                        ),
-                      );
-                    },
                   ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SidebarQuickAction extends StatelessWidget {
+  final VoidCallback onPressed;
+  final Widget icon;
+  final String label;
+
+  const _SidebarQuickAction({
+    required this.onPressed,
+    required this.icon,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.white,
+        side: BorderSide(
+          color: Colors.white.withValues(alpha: 0.12),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          icon,
+          const SizedBox(height: 6),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _MetricBadge({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 164),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.28),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.secondaryContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              size: 15,
+              color: Theme.of(context).colorScheme.secondary,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyWorkspaceHero extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final int sessionCount;
+  final int imageHistoryCount;
+
+  const _EmptyWorkspaceHero({
+    required this.title,
+    required this.subtitle,
+    required this.sessionCount,
+    required this.imageHistoryCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFFF8FBFF),
+            Color(0xFFF2F7FF),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: Theme.of(
+                context,
+              ).colorScheme.secondaryContainer.withValues(alpha: 0.95),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Icon(
+              Icons.auto_awesome_rounded,
+              size: 28,
+              color: Theme.of(context).colorScheme.secondary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.45,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 13.5,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              height: 1.55,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 12,
+            runSpacing: 10,
+            children: [
+              const _MetricBadge(
+                icon: Icons.bolt_rounded,
+                label: '快速出图',
+                value: '企业级工作流',
+              ),
+              _MetricBadge(
+                icon: Icons.layers_rounded,
+                label: '会话能力',
+                value: '$sessionCount 个本地会话',
+              ),
+              _MetricBadge(
+                icon: Icons.photo_library_rounded,
+                label: '历史记录',
+                value: '$imageHistoryCount 张图片',
+              ),
+            ],
           ),
         ],
       ),
@@ -2816,7 +3242,7 @@ class _GeneratedImageHistorySheet extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    '${entry.aspectRatio ?? '未知比例'} · ${_formatTime(entry.createdAt)}',
+                                    '${ImageGenerationOptions.displaySizeLabel(entry.size ?? 'auto')} · ${ImageGenerationOptions.displayQualityLabel(entry.quality ?? 'auto')} · ${_formatTime(entry.createdAt)}',
                                     style: TextStyle(
                                       color: Theme.of(context)
                                           .colorScheme
@@ -3183,106 +3609,183 @@ class ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
     final isUser = message.role == Role.user;
     final bubbleColor =
-        isUser ? const Color(0xFF214F4C) : const Color(0xFFF4EEE4);
+        isUser ? const Color(0xFF1E3A5F) : const Color(0xFFF8FAFC);
     final textColor =
         isUser ? Colors.white : Theme.of(context).colorScheme.onSurface;
-    final alignment =
-        isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start;
-
     final avatar = Container(
-      width: 42,
-      height: 42,
+      width: 36,
+      height: 36,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          colors: isUser
-              ? const [Color(0xFF214F4C), Color(0xFF7B6842)]
-              : const [Color(0xFFE7DDD0), Color(0xFFCFC2B1)],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        color: isUser ? const Color(0xFFDBEAFE) : const Color(0xFFE2E8F0),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Icon(
         isUser ? Icons.person : Icons.smart_toy,
-        color: isUser ? Colors.white : const Color(0xFF4E5C5A),
-        size: 20,
+        color: isUser ? const Color(0xFF2563EB) : const Color(0xFF475569),
+        size: 18,
       ),
     );
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment:
-            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: [
-          if (!isUser) avatar,
-          if (!isUser) const SizedBox(width: 12),
-          Flexible(
-            child: Column(
-              crossAxisAlignment: alignment,
-              children: [
-                if (message.text.isNotEmpty)
-                  _CopyableMessageContent(
-                    text: message.text,
-                    bubbleColor: bubbleColor,
-                    textColor: textColor,
-                    isUser: isUser,
-                    onCopy: () => _copyMessageText(context, message.text),
-                  ),
-                if (message.hasImages) const SizedBox(height: 12),
-                for (final localImage in message.localImages) ...[
-                  _ChatImageFrame(
-                    onTap: () => _showImagePreview(
-                      context,
-                      Image.memory(
-                        localImage.bytes,
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.high,
-                      ),
-                    ),
-                    child: Image.memory(
-                      localImage.bytes,
-                      fit: BoxFit.cover,
-                      filterQuality: FilterQuality.high,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                for (final image in message.generatedImages) ...[
-                  _ChatImageFrame(
-                    onTap: () => _showImagePreview(
-                      context,
-                      _buildGeneratedImageWidget(
-                        image,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                    child: _buildGeneratedImageWidget(
-                      image,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _ImageDownloadAction(
-                    image: image,
-                    alignment:
-                        isUser ? Alignment.centerRight : Alignment.centerLeft,
-                  ),
-                ],
-              ],
-            ),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Align(
+        alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isUser
+                ? (screenWidth < 720
+                    ? screenWidth * 0.8
+                    : screenWidth < 980
+                        ? 460
+                        : 520)
+                : (screenWidth < 980 ? screenWidth * 0.92 : 860),
           ),
-          if (isUser) const SizedBox(width: 12),
-          if (isUser) avatar,
-        ],
+          child: isUser
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Flexible(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (message.text.isNotEmpty)
+                            _CopyableMessageContent(
+                              text: message.text,
+                              bubbleColor: bubbleColor,
+                              textColor: textColor,
+                              isUser: true,
+                              onCopy: () =>
+                                  _copyMessageText(context, message.text),
+                            ),
+                          if (message.hasImages) const SizedBox(height: 12),
+                          for (final localImage in message.localImages) ...[
+                            _ChatImageFrame(
+                              onTap: () => _showImagePreview(
+                                context,
+                                Image.memory(
+                                  localImage.bytes,
+                                  fit: BoxFit.contain,
+                                  filterQuality: FilterQuality.high,
+                                ),
+                              ),
+                              child: Image.memory(
+                                localImage.bytes,
+                                fit: BoxFit.cover,
+                                filterQuality: FilterQuality.high,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          for (final image in message.generatedImages) ...[
+                            _ChatImageFrame(
+                              onTap: () => _showImagePreview(
+                                context,
+                                _buildGeneratedImageWidget(
+                                  image,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                              child: _buildGeneratedImageWidget(
+                                image,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            _ImageDownloadAction(
+                              image: image,
+                              alignment: Alignment.centerRight,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    avatar,
+                  ],
+                )
+              : Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(0, 2, 0, 2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      avatar,
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'AI 助手',
+                              style: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            if (message.text.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              _CopyableMessageContent(
+                                text: message.text,
+                                bubbleColor: bubbleColor,
+                                textColor: textColor,
+                                isUser: false,
+                                onCopy: () =>
+                                    _copyMessageText(context, message.text),
+                              ),
+                            ],
+                            if (message.hasImages) const SizedBox(height: 12),
+                            for (final localImage in message.localImages) ...[
+                              _ChatImageFrame(
+                                onTap: () => _showImagePreview(
+                                  context,
+                                  Image.memory(
+                                    localImage.bytes,
+                                    fit: BoxFit.contain,
+                                    filterQuality: FilterQuality.high,
+                                  ),
+                                ),
+                                child: Image.memory(
+                                  localImage.bytes,
+                                  fit: BoxFit.cover,
+                                  filterQuality: FilterQuality.high,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                            for (final image in message.generatedImages) ...[
+                              _ChatImageFrame(
+                                onTap: () => _showImagePreview(
+                                  context,
+                                  _buildGeneratedImageWidget(
+                                    image,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                                child: _buildGeneratedImageWidget(
+                                  image,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              _ImageDownloadAction(
+                                image: image,
+                                alignment: Alignment.centerLeft,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+        ),
       ),
     );
   }
@@ -3305,61 +3808,94 @@ class _CopyableMessageContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: bubbleColor,
-        borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(22),
-          topRight: const Radius.circular(22),
-          bottomLeft:
-              isUser ? const Radius.circular(22) : const Radius.circular(8),
-          bottomRight:
-              isUser ? const Radius.circular(8) : const Radius.circular(22),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 14,
-            offset: const Offset(0, 8),
+    if (isUser) {
+      return Container(
+        decoration: BoxDecoration(
+          color: bubbleColor,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(22),
+            topRight: Radius.circular(22),
+            bottomLeft: Radius.circular(22),
+            bottomRight: Radius.circular(8),
           ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 18,
-        vertical: 14,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: SelectableText(
-              text,
-              style: TextStyle(
-                fontSize: 16,
-                color: textColor,
-                height: 1.56,
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 13,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: SelectableText(
+                text,
+                style: TextStyle(
+                  fontSize: 15.5,
+                  color: textColor,
+                  height: 1.52,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            onPressed: onCopy,
-            tooltip: '复制文字',
-            constraints: const BoxConstraints(
-              minWidth: 32,
-              minHeight: 32,
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: onCopy,
+              tooltip: '复制文字',
+              constraints: const BoxConstraints(
+                minWidth: 32,
+                minHeight: 32,
+              ),
+              padding: EdgeInsets.zero,
+              splashRadius: 18,
+              visualDensity: VisualDensity.compact,
+              icon: Icon(
+                Icons.content_copy_rounded,
+                size: 18,
+                color: textColor.withValues(alpha: 0.78),
+              ),
             ),
-            padding: EdgeInsets.zero,
-            splashRadius: 18,
-            visualDensity: VisualDensity.compact,
-            icon: Icon(
-              Icons.content_copy_rounded,
-              size: 18,
-              color: textColor.withValues(alpha: 0.78),
+          ],
+        ),
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: SelectableText(
+            text,
+            style: TextStyle(
+              fontSize: 15.5,
+              color: textColor,
+              height: 1.78,
             ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 8),
+        IconButton(
+          onPressed: onCopy,
+          tooltip: '复制文字',
+          constraints: const BoxConstraints(
+            minWidth: 32,
+            minHeight: 32,
+          ),
+          padding: EdgeInsets.zero,
+          splashRadius: 18,
+          visualDensity: VisualDensity.compact,
+          icon: Icon(
+            Icons.content_copy_rounded,
+            size: 18,
+            color: textColor.withValues(alpha: 0.6),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -3521,13 +4057,11 @@ class _ImageDownloadActionState extends State<_ImageDownloadAction> {
 
 class _ComposerImagePreview extends StatelessWidget {
   final List<ChatImageAttachment> attachments;
-  final void Function(int index)? onRemoveAt;
-  final void Function(int index)? onPreviewAt;
+  final ValueChanged<int>? onRemoveAt;
 
   const _ComposerImagePreview({
     required this.attachments,
     this.onRemoveAt,
-    this.onPreviewAt,
   });
 
   @override
@@ -3542,137 +4076,169 @@ class _ComposerImagePreview extends StatelessWidget {
           width: 1,
         ),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(
-                '已选择参考图（${attachments.length} 张）',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.w600,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '已选择参考图（${attachments.length} 张）',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '左右滑动可查看',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 146,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: attachments.length,
-              separatorBuilder: (context, index) => const SizedBox(width: 10),
-              itemBuilder: (context, index) {
-                final attachment = attachments[index];
-                return SizedBox(
-                  width: 96,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Stack(
-                        children: [
-                          Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: onPreviewAt == null
-                                  ? null
-                                  : () => onPreviewAt!(index),
-                              borderRadius: BorderRadius.circular(14),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(14),
-                                child: Stack(
-                                  children: [
-                                    Image.memory(
-                                      attachment.bytes,
-                                      width: 96,
-                                      height: 96,
-                                      fit: BoxFit.cover,
-                                    ),
-                                    if (onPreviewAt != null)
-                                      Positioned(
-                                        right: 6,
-                                        bottom: 6,
-                                        child: IgnorePointer(
-                                          child: DecoratedBox(
-                                            decoration: BoxDecoration(
-                                              color: Colors.black.withValues(
-                                                alpha: 0.54,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(999),
-                                            ),
-                                            child: const Padding(
-                                              padding: EdgeInsets.all(6),
-                                              child: Icon(
-                                                Icons.open_in_full_rounded,
-                                                color: Colors.white,
-                                                size: 14,
-                                              ),
-                                            ),
-                                          ),
+                const SizedBox(height: 4),
+                SizedBox(
+                  height: 90,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: attachments.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(width: 10),
+                    itemBuilder: (context, index) {
+                      final attachment = attachments[index];
+                      return SizedBox(
+                        width: 82,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: Image.memory(
+                                    attachment.bytes,
+                                    width: 82,
+                                    height: 62,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 4,
+                                  right: 4,
+                                  child: Material(
+                                    color: Colors.black.withValues(alpha: 0.5),
+                                    borderRadius: BorderRadius.circular(999),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(999),
+                                      onTap: onRemoveAt == null
+                                          ? null
+                                          : () => onRemoveAt!(index),
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(4),
+                                        child: Icon(
+                                          Icons.close_rounded,
+                                          size: 12,
+                                          color: Colors.white,
                                         ),
                                       ),
-                                  ],
+                                    ),
+                                  ),
                                 ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              attachment.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                                fontSize: 11.5,
                               ),
                             ),
-                          ),
-                          Positioned(
-                            top: 4,
-                            right: 4,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.56),
-                                shape: BoxShape.circle,
-                              ),
-                              child: IconButton(
-                                onPressed: onRemoveAt == null
-                                    ? null
-                                    : () => onRemoveAt!(index),
-                                tooltip: '移除图片',
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(
-                                  minWidth: 28,
-                                  minHeight: 28,
-                                ),
-                                icon: const Icon(
-                                  Icons.close_rounded,
-                                  size: 16,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        attachment.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          fontSize: 12,
+                          ],
                         ),
-                      ),
-                    ],
+                      );
+                    },
                   ),
-                );
-              },
+                ),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _GenerationOptionDropdown extends StatelessWidget {
+  final String label;
+  final String value;
+  final List<String> items;
+  final ValueChanged<String>? onChanged;
+
+  const _GenerationOptionDropdown({
+    required this.label,
+    required this.value,
+    required this.items,
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.35),
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          isDense: true,
+          borderRadius: BorderRadius.circular(16),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontWeight: FontWeight.w600,
+          ),
+          dropdownColor: Colors.white,
+          selectedItemBuilder: (context) => items
+              .map(
+                (item) => Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '$label：${label == '尺寸' ? ImageGenerationOptions.displaySizeLabel(item) : ImageGenerationOptions.displayQualityLabel(item)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              )
+              .toList(growable: false),
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: Theme.of(context).colorScheme.secondary,
+          ),
+          onChanged: onChanged == null
+              ? null
+              : (nextValue) {
+                  if (nextValue != null) {
+                    onChanged!(nextValue);
+                  }
+                },
+          items: items
+              .map(
+                (item) => DropdownMenuItem<String>(
+                  value: item,
+                  child: Text(
+                    '$label：${label == '尺寸' ? ImageGenerationOptions.displaySizeLabel(item) : ImageGenerationOptions.displayQualityLabel(item)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              )
+              .toList(growable: false),
+        ),
       ),
     );
   }

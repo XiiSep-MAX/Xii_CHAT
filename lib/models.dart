@@ -36,55 +36,104 @@ class GeneratedImageAsset {
 }
 
 class ImageGenerationOptions {
-  static const List<String> commonAspectRatios = [
-    '1:1',
-    '3:2',
-    '2:3',
-    '4:3',
-    '3:4',
-    '5:4',
-    '4:5',
-    '16:9',
-    '9:16',
+  static const List<String> availableSizes = [
+    'auto',
+    '1024x1024',
+    '1536x1024',
+    '1024x1536',
+    '2048x2048',
+    '2048x1152',
+    '3840x2160',
+    '2160x3840',
+  ];
+
+  static const List<String> availableQualities = [
+    'auto',
+    'low',
+    'medium',
+    'high',
   ];
 
   static const double unitPriceUsd = 0.08;
 
-  final String aspectRatio;
+  final String size;
+  final String quality;
 
   const ImageGenerationOptions({
-    required this.aspectRatio,
+    required this.size,
+    required this.quality,
   });
 
   factory ImageGenerationOptions.defaults() {
-    return const ImageGenerationOptions(aspectRatio: '1:1');
+    return const ImageGenerationOptions(
+      size: 'auto',
+      quality: 'auto',
+    );
   }
 
   ImageGenerationOptions copyWith({
-    String? aspectRatio,
+    String? size,
+    String? quality,
   }) {
     return ImageGenerationOptions(
-      aspectRatio: aspectRatio ?? this.aspectRatio,
+      size: size ?? this.size,
+      quality: quality ?? this.quality,
     ).normalized();
   }
 
   ImageGenerationOptions normalized() {
-    final ratios = availableAspectRatios();
-    final normalizedRatio =
-        ratios.contains(aspectRatio) ? aspectRatio : ratios.first;
+    final normalizedSize =
+        availableSizes.contains(size) ? size : availableSizes.first;
+    final normalizedQuality = availableQualities.contains(quality)
+        ? quality
+        : availableQualities.first;
 
     return ImageGenerationOptions(
-      aspectRatio: normalizedRatio,
+      size: normalizedSize,
+      quality: normalizedQuality,
     );
-  }
-
-  static List<String> availableAspectRatios() {
-    return commonAspectRatios;
   }
 
   double get priceUsd => unitPriceUsd;
 
-  String get summary => aspectRatio;
+  String get summary =>
+      '${displaySizeLabel(size)} · ${displayQualityLabel(quality)}';
+
+  static String displaySizeLabel(String value) {
+    switch (value) {
+      case '1024x1024':
+        return '1:1';
+      case '1536x1024':
+        return '3:2';
+      case '1024x1536':
+        return '2:3';
+      case '2048x2048':
+        return '1:1（2K）';
+      case '2048x1152':
+        return '16:9（2K）';
+      case '3840x2160':
+        return '16:9（4K）';
+      case '2160x3840':
+        return '9:16（4K）';
+      case 'auto':
+      default:
+        return '自动';
+    }
+  }
+
+  static String displayQualityLabel(String value) {
+    switch (value) {
+      case 'low':
+        return '低质量';
+      case 'medium':
+        return '中等质量';
+      case 'high':
+        return '高质量';
+      case 'auto':
+      default:
+        return '自动';
+    }
+  }
 }
 
 class ChatMessage {
@@ -138,7 +187,8 @@ class GeneratedImageHistoryEntry {
   final String sessionTitle;
   final String messageText;
   final DateTime createdAt;
-  final String? aspectRatio;
+  final String? size;
+  final String? quality;
   final GeneratedImageAsset image;
 
   const GeneratedImageHistoryEntry({
@@ -148,7 +198,8 @@ class GeneratedImageHistoryEntry {
     required this.sessionTitle,
     required this.messageText,
     required this.createdAt,
-    required this.aspectRatio,
+    required this.size,
+    required this.quality,
     required this.image,
   });
 }

@@ -522,7 +522,8 @@ class LocalStorageService {
         sessionTitle: (row['session_title'] as String?) ?? '未命名会话',
         messageText: (row['message_text'] as String?) ?? '',
         createdAt: DateTime.parse(row['created_at'] as String),
-        aspectRatio: options?.aspectRatio,
+        size: options?.size,
+        quality: options?.quality,
         image: _mapGeneratedImage(row),
       );
     }).toList(growable: false);
@@ -586,7 +587,8 @@ class LocalStorageService {
       return null;
     }
     return jsonEncode({
-      'aspectRatio': options.aspectRatio,
+      'size': options.size,
+      'quality': options.quality,
     });
   }
 
@@ -600,12 +602,37 @@ class LocalStorageService {
       return null;
     }
 
-    final aspectRatio = decoded['aspectRatio']?.toString();
-    if (aspectRatio == null || aspectRatio.isEmpty) {
+    final size = decoded['size']?.toString();
+    final quality = decoded['quality']?.toString();
+    final legacyAspectRatio = decoded['aspectRatio']?.toString();
+
+    if ((size == null || size.isEmpty) &&
+        (quality == null || quality.isEmpty) &&
+        (legacyAspectRatio == null || legacyAspectRatio.isEmpty)) {
       return null;
     }
 
-    return ImageGenerationOptions(aspectRatio: aspectRatio).normalized();
+    return ImageGenerationOptions(
+      size: size?.isNotEmpty == true
+          ? size!
+          : _mapLegacyAspectRatioToSize(legacyAspectRatio),
+      quality: quality?.isNotEmpty == true ? quality! : 'auto',
+    ).normalized();
+  }
+
+  String _mapLegacyAspectRatioToSize(String? aspectRatio) {
+    switch (aspectRatio) {
+      case '1:1':
+        return '1024x1024';
+      case '3:2':
+      case '16:9':
+        return '1536x1024';
+      case '2:3':
+      case '9:16':
+        return '1024x1536';
+      default:
+        return 'auto';
+    }
   }
 
   String? _encodeLocalImages(List<ChatImageAttachment> images) {

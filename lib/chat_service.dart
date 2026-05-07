@@ -43,6 +43,17 @@ class OpenAIChatService {
     return 'https://www.packyapi.com/v1/chat/completions';
   }
 
+  static String get _imageApiBaseUrl {
+    final chatUrl = _apiUrl;
+    if (chatUrl.endsWith('/chat/completions')) {
+      return chatUrl.substring(0, chatUrl.length - '/chat/completions'.length);
+    }
+    if (chatUrl.endsWith('/v1')) {
+      return chatUrl;
+    }
+    return '$chatUrl/v1';
+  }
+
   static String get _model {
     final configuredModel = EnvConfig.get('OPENAI_IMAGE_MODEL')?.trim();
     if (configuredModel != null && configuredModel.isNotEmpty) {
@@ -87,23 +98,19 @@ class OpenAIChatService {
     }
 
     final response = await http.post(
-      Uri.parse(_apiUrl),
+      Uri.parse('$_imageApiBaseUrl/images/generations'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $openAIApiKey',
       },
       body: jsonEncode({
         'model': _model,
-        'messages': [
-          {
-            'role': 'user',
-            'content': _buildMessageContent(
-              prompt: composedPrompt,
-              imageAttachments: imageAttachments,
-            ),
-          },
-        ],
-        'temperature': 0.8,
+        'prompt': composedPrompt,
+        'n': 1,
+        'size': options.size,
+        'quality': options.quality,
+        if (imageAttachments.isNotEmpty)
+          'image': imageAttachments.map(_buildDataUrl).toList(growable: false),
       }),
     );
 
@@ -142,7 +149,8 @@ class OpenAIChatService {
         'installId': licenseStatus.installId,
         'prompt': prompt,
         'composedPrompt': composedPrompt,
-        'aspectRatio': options.aspectRatio,
+        'size': options.size,
+        'quality': options.quality,
         'referenceImages': imageAttachments
             .map(
               (image) => {
@@ -179,28 +187,7 @@ class OpenAIChatService {
         : trimmedPrompt;
 
     return '$basePrompt\n\n'
-        '生成要求：尺寸比例 ${options.aspectRatio}。';
-  }
-
-  Object _buildMessageContent({
-    required String prompt,
-    List<ChatImageAttachment> imageAttachments = const [],
-  }) {
-    if (imageAttachments.isEmpty) {
-      return prompt;
-    }
-
-    return <Map<String, Object>>[
-      {'type': 'text', 'text': prompt},
-      ...imageAttachments.map(
-        (attachment) => {
-          'type': 'image_url',
-          'image_url': {
-            'url': _buildDataUrl(attachment),
-          },
-        },
-      ),
-    ];
+        '生成要求：尺寸 ${options.size}；质量 ${options.quality}。';
   }
 
   String _buildDataUrl(ChatImageAttachment attachment) {
@@ -224,6 +211,10 @@ class OpenAIChatService {
   }
 
   dynamic _extractResponseContent(Map<String, dynamic> body) {
+    if (body['data'] != null) {
+      return body['data'];
+    }
+
     final choices = body['choices'];
     if (choices is List && choices.isNotEmpty) {
       final firstChoice = choices.first;
@@ -233,10 +224,6 @@ class OpenAIChatService {
           return message['content'];
         }
       }
-    }
-
-    if (body['data'] != null) {
-      return body['data'];
     }
 
     return null;
@@ -262,6 +249,21 @@ class OpenAIChatService {
           imageUrl: normalizedUrl,
           fileName: _resolveFileNameFromUrl(normalizedUrl, options),
           mimeType: _resolveMimeTypeFromUrl(normalizedUrl),
+        ),
+      );
+    }
+
+    void addImageBase64(String value, {String mimeType = 'image/png'}) {
+      final normalized = value.trim();
+      if (normalized.isEmpty) {
+        return;
+      }
+
+      generatedImages.add(
+        GeneratedImageAsset(
+          bytes: base64Decode(normalized),
+          fileName: _resolveFileNameFromBytes(options, mimeType),
+          mimeType: mimeType,
         ),
       );
     }
@@ -309,6 +311,11 @@ class OpenAIChatService {
         if (directUrl != null) {
           addImageUrl(directUrl);
         }
+
+        final b64Json = item['b64_json']?.toString();
+        if (b64Json != null && b64Json.isNotEmpty) {
+          addImageBase64(b64Json);
+        }
       }
     } else if (content is Map) {
       if (content['text'] != null) {
@@ -318,6 +325,11 @@ class OpenAIChatService {
       final directUrl = _readImageUrlFromMap(content);
       if (directUrl != null) {
         addImageUrl(directUrl);
+      }
+
+      final b64Json = content['b64_json']?.toString();
+      if (b64Json != null && b64Json.isNotEmpty) {
+        addImageBase64(b64Json);
       }
     } else {
       final fallbackText = content.toString().trim();
@@ -417,7 +429,21 @@ class OpenAIChatService {
     }
 
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    return 'packy_${options.aspectRatio.replaceAll(':', 'x')}_$timestamp.png';
+    return 'packy_${options.size}_$timestamp.png';
+  }
+
+  String _resolveFileNameFromBytes(
+    ImageGenerationOptions options,
+    String mimeType,
+  ) {
+    final extension = switch (mimeType.toLowerCase()) {
+      'image/jpeg' => 'jpg',
+      'image/webp' => 'webp',
+      _ => 'png',
+    };
+
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    return 'packy_${options.size}_$timestamp.$extension';
   }
 
   String _resolveMimeTypeFromUrl(String url) {
