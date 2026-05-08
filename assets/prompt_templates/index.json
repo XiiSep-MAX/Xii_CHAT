@@ -1,0 +1,46 @@
+{
+  "categories": [
+    {
+      "id": "portrait",
+      "title": "人像摄影",
+      "description": "适合写真人像、电影感肖像、生活方式照片。",
+      "file": "assets/prompt_templates/portrait.json"
+    },
+    {
+      "id": "poster",
+      "title": "海报类",
+      "description": "适合品牌宣传图、城市海报、插画海报。",
+      "file": "assets/prompt_templates/poster.json"
+    },
+    {
+      "id": "character",
+      "title": "角色设计",
+      "description": "适合角色设定页、角色卡、立绘资料页。",
+      "file": "assets/prompt_templates/character.json"
+    },
+    {
+      "id": "ui",
+      "title": "UI 与社媒模拟",
+      "description": "适合界面图、社媒截图、内容页面。",
+      "file": "assets/prompt_templates/ui.json"
+    },
+    {
+      "id": "ecommerce",
+      "title": "商品与静物",
+      "description": "适合电商主图、卖点展示、简洁背景产品图。",
+      "file": "assets/prompt_templates/ecommerce.json"
+    },
+    {
+      "id": "comparison",
+      "title": "模型对比",
+      "description": "适合做创意构图测试、视觉实验、对比型提示词。",
+      "file": "assets/prompt_templates/comparison.json"
+    },
+    {
+      "id": "ad_creative",
+      "title": "广告创意",
+      "description": "适合做广告版式、多面板宣传图和商业创意。",
+      "file": "assets/prompt_templates/ad_creative.json"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 name: ai_chat_app
 description: A simple Flutter AI chat app powered by OpenAI.
 publish_to: 'none'
-version: 1.2.9+11
+version: 1.2.10+12
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -14,6 +14,7 @@ dependencies:
   crypto: ^3.0.3
   http: ^1.1.0
   cached_network_image: ^3.2.3
+  desktop_drop: ^0.4.4
   file_picker: ^8.0.7
   path_provider: ^2.1.0
   path: ^1.8.0
@@ -28,6 +29,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/prompt_templates/
 
 hooks:
   user_defines:

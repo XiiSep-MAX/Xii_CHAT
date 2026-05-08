@@ -1,11 +1,11 @@
 {
-  "version": "1.2.9",
-  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.9.zip",
+  "version": "1.2.10",
+  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.10.zip",
   "mirrorUrls": [
-    "https://github.com/XiiSep-MAX/Xii_CHAT/releases/download/v1.2.9/Xii_Raw_Graph_Trial_v1.2.9.zip"
+    "https://github.com/XiiSep-MAX/Xii_CHAT/releases/download/v1.2.10/Xii_Raw_Graph_Trial_v1.2.10.zip"
   ],
-  "sha256": "a91523313b06751293aebcfe5046ca25ee5aaf4a6e5efb456903c14f5fce2a2f",
-  "releaseNotes": "🎨 1.2.9 前端与图生图增强版\n\n本次更新包含：\n- 整个主界面重新设计，更像大厂 AI 工作台\n- 对话区改成更接近 GPT 的左右布局\n- 右侧工作区与输入区自适应优化\n- 参考图上传改为支持多张图片\n- 图生图 generation 请求改为参考 base64 图像与提示词一起发送",
+  "sha256": "15d3a08ef69e4a2da8da5dc44c05eeb0e9543c5e89758b6cc8caa3794764c980",
+  "releaseNotes": "🎨 1.2.10 交互与模板库增强版\n\n本次更新包含：\n- 参考图上传支持追加、多图去重与桌面拖拽\n- 提示词模板库升级为分类案例库并改为远程图懒加载\n- 会话切换次数与切换记录功能下线，界面更简洁\n- 输入工作台与主界面布局继续优化",
   "isForced": false,
-  "signature": "P7kZbEOUBCXZCsQFq63WCnwYWdEM5smvID3Haxd1qYlcHS8MlhfGCoZPGfGJ5wytAoWUB8AjblursM3x4RTPCw=="
+  "signature": "NSYn7qI37y9mjrlgPBGYJmkFO2WOu1hGxXtPeMNiSVfUk09I+kHwBbWsHD/0W6SJgMoaEMSy4pJ+C3B9AOkxBg=="
 }

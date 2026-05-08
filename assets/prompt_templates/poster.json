@@ -1,0 +1,32 @@
+{
+  "items": [
+    {
+      "title": "产品宣传海报",
+      "summary": "复古旅行海报构图，强图形感与手绘质感。",
+      "source": "来源：poster case 1 · EvoLinkAI 仓库",
+      "prompt": "Modern pencil illustration of Vintage travel poster illustration of the Amalfi Coast, Italy, panoramic coastal cliff road scene, classic 1960s white car driving along a curved seaside road, deep blue Mediterranean sea with small sailboats, colorful pastel hillside village, bright blue sky with soft clouds, lemon tree branches with vibrant yellow lemons framing the foreground, warm summer sunlight, bold vibrant colors, retro 1950s travel poster style, cinematic composition, high detail, screen print texture, graphic illustration. Hand-drawn style, illustration with loose strokes and defined contours. High-contrast color palette, maintaining chromatic harmony between background and elements. Contemporary and decorative aesthetic.",
+      "coverUrl": "https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts@main/images/poster_case1/output.jpg"
+    },
+    {
+      "title": "美食海报",
+      "summary": "成都主题手绘美食地图，俯视插画与地点标注结合。",
+      "source": "来源：poster case 104 · EvoLinkAI 仓库",
+      "prompt": "一张手绘风格的城市美食地图，以成都为主题。画面以鸟瞰视角的手绘简化城市地图为底，标注主要道路和地标但不追求精确比例而是追求可爱的手绘感。地图上分布着 12 个美食地点的精致手绘小插画：春熙路的串串香、宽窄巷子的三大炮、建设路的蛋烘糕、玉林路的火锅等，每个插画约占地图的 5% 面积，旁边用手写体标注店名和一句推荐语。地图边缘用手绘藤蔓和辣椒装饰形成边框，右下角有手绘指南针和图例说明，左上角标题为“成都·吃货暴走地图”，整体画风为水彩+彩铅混合的手绘质感，图片比例 1:1。",
+      "coverUrl": "https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts@main/images/poster_case104/output.jpg"
+    },
+    {
+      "title": "城市春季海报",
+      "summary": "城市地标与河流构图融合的高端宣传海报。",
+      "source": "来源：poster case 191 · EvoLinkAI 仓库",
+      "prompt": "A striking Spring 2026 city poster for Boston with an elegant celebratory mood and a bold contemporary design. On a clean off-white textured background with large areas of negative space, a miniature single sculler rows across the lower right corner of the image on a narrow ribbon of reflective water. The wake from the oar sweeps upward in a dynamic calligraphic curve, gradually transforming into the Charles River and then into a dreamlike hand-painted panorama of Boston. Inside this flowing river-shaped composition are iconic Boston elements: the Back Bay skyline, Beacon Hill brownstones, Acorn Street, Boston Public Garden, Swan Boats, Zakim Bridge, Fenway-inspired details, historic brick architecture, harbor ferries, and the city’s waterfront atmosphere. Soft morning fog, golden spring light, subtle festive accents in crimson and gold, rich detail, layered depth, sophisticated city-poster aesthetics, fresh and refined, visually powerful but not overcrowded. Elegant typography in the lower left reads “SPRING 2026” with a vertical slogan “BOSTON, A CITY OF RIVER, MEMORY, AND INVENTION”, premium graphic design, 9:16.",
+      "coverUrl": "https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts@main/images/poster_case191/output.jpg"
+    },
+    {
+      "title": "极简中文海报",
+      "summary": "留白、几何图形和醒目主视觉构成的极简概念海报。",
+      "source": "来源：poster case 4 · EvoLinkAI 仓库",
+      "prompt": "生成一张极简中文设计海报，以留白、几何图形和一个醒目的主视觉为核心，中文排版克制，颜色统一，整体像艺术展或品牌概念海报。",
+      "coverUrl": "https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts@main/images/poster_case4/output.jpg"
+    }
+  ]
+}

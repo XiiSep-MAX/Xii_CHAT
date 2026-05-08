@@ -1,0 +1,32 @@
+{
+  "items": [
+    {
+      "title": "动漫截图转角色卡",
+      "summary": "把参考角色图转成像真实动画截图的镜头感画面。",
+      "source": "来源：character case 1 · EvoLinkAI 仓库",
+      "prompt": "Show me the attached image as a snapshot from an actual anime",
+      "coverUrl": "https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts@main/images/character_case1/output.jpg"
+    },
+    {
+      "title": "Q版角色设定页",
+      "summary": "高冲击动作场景，适合角色战斗姿态和能量特效。",
+      "source": "来源：character case 2 · EvoLinkAI 仓库",
+      "prompt": "An anime-style illustration of a high-impact martial arts battle between two young female fighters in a traditional wooden martial arts dojo. In the foreground, a girl with black hair in a high bun wears a red and white Chinese-style martial arts outfit with baggy pants. She is in a dynamic, low, forward-thrusting stance, surrounded by swirling red energy and water splashes. In the background to the right, a girl with light purple hair in twin buns wears a green and purple Chinese dress with gold embroidery and black tights. She is leaping through the air in a flying kick pose, surrounded by swirling blue energy. The wooden floorboards are splintering from the intense impact, with debris and dust flying through the air. Above them hangs a weathered wooden sign with the text “武術会”. The scene features dramatic lighting, a low-angle dynamic perspective, and intense action effects.",
+      "coverUrl": "https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts@main/images/character_case2/output.jpg"
+    },
+    {
+      "title": "正式角色资料表",
+      "summary": "三视图、表情、服装拆解与配色说明一体化展示。",
+      "source": "来源：基于 character 类案例整理",
+      "prompt": "基于此角色和背景，请制作一份类似官方设定资料的角色资料卡。包含三视图：正面、侧面和背面；添加角色面部表情的变化；分解并展示服装和装备的详细部分；添加色板；包含世界观设定的简要说明；总体上使用有组织的布局（白色背景，插画风格），高分辨率、专业概念艺术风格。",
+      "coverUrl": null
+    },
+    {
+      "title": "角色战斗截图",
+      "summary": "更强调动势和构图张力的动画感角色场景。",
+      "source": "来源：character case 10 · EvoLinkAI 仓库",
+      "prompt": "An anime-style illustration of a {argument name=\"action type\" default=\"high-impact martial arts battle\"} between two young female fighters in a {argument name=\"setting\" default=\"traditional wooden martial arts dojo\"}. In the foreground, a girl with black hair in a high bun wears a {argument name=\"character 1 color theme\" default=\"red and white\"} Chinese-style martial arts outfit with baggy pants. She is in a dynamic, low, forward-thrusting stance, surrounded by swirling red energy and water splashes. In the background to the right, a girl with light purple hair in twin buns wears a {argument name=\"character 2 color theme\" default=\"green and purple\"} Chinese dress with gold embroidery and black tights. She is leaping through the air in a flying kick pose, surrounded by swirling blue energy. The wooden floorboards are splintering from the intense impact, with debris and dust flying through the air. Above them hangs a weathered wooden sign with the text \"{argument name=\"sign text\" default=\"武術会\"}\". The scene features dramatic lighting, a low-angle dynamic perspective, and intense action effects.",
+      "coverUrl": "https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts@main/images/character_case10/output.jpg"
+    }
+  ]
+}

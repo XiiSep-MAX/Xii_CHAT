@@ -1,0 +1,32 @@
+{
+  "items": [
+    {
+      "title": "木书架数量测试",
+      "summary": "用结构化要求测试模型遵循能力和对象数量控制。",
+      "source": "来源：comparison case 5 · EvoLinkAI 仓库",
+      "prompt": "A wooden bookshelf consisting of three shelves: On the top shelf, there should be one book, on the second shelf, there should be three books, and on the bottom shelf, there should be seven books.",
+      "coverUrl": "https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts@main/images/comparison_case5/output.jpg"
+    },
+    {
+      "title": "四季眼部特写",
+      "summary": "春夏秋冬四屏构图，适合细节和风格控制测试。",
+      "source": "来源：comparison case 10 · EvoLinkAI 仓库",
+      "prompt": "以眼部特写图片为基础，生成3:4的四屏构图超写实眼部特写，四屏按春夏秋冬上下排序。第一屏：眼眸中带着绽粉樱色的美瞳……整体呈现梦幻眼眸四季交替的唯美梦幻治愈画面，微调各屏的光影强度，让画面氛围感更浓郁。",
+      "coverUrl": "https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts@main/images/comparison_case10/output.jpg"
+    },
+    {
+      "title": "轮廓宇宙海报",
+      "summary": "适合做复杂叙事构图与主题隐喻视觉实验。",
+      "source": "来源：comparison case 23 · EvoLinkAI 仓库",
+      "prompt": "请根据【主题：xxx】自动生成一张高审美的“轮廓宇宙 / 收藏版叙事海报”风格作品。不要将画面局限于固定器物或常见容器，而是由 AI 根据主题自行判断并选择一个最契合、最有象征意义、轮廓最强、最适合承载完整叙事世界的主轮廓载体。",
+      "coverUrl": "https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts@main/images/comparison_case23/output.jpg"
+    },
+    {
+      "title": "中式黑暗神话",
+      "summary": "重氛围、大场景、多角色的暗黑史诗构图测试。",
+      "source": "来源：comparison case 29 · EvoLinkAI 仓库",
+      "prompt": "中式怪异，黑暗神秘风格融合中式美学，完美细节，多重管线渲染，完美建模。西游记背景，狮驼岭，千妖万怪，坐在左边巨大王座上的大象王重甲妖精，坐在中间巨大王座上的狮王重甲妖精，坐在右边巨大王座上大鹏鸟王重甲妖精。渺小的背对镜头孙悟空肩抗金箍棒步行前进，孙悟空身穿铠甲，近地仰拍镜头，长焦镜头，强烈阴影。极致细节刻画，多次修改，正确透视和主体线条，精致细节",
+      "coverUrl": "https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts@main/images/comparison_case29/output.jpg"
+    }
+  ]
+}

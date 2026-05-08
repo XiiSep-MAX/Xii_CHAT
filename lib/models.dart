@@ -165,7 +165,6 @@ class ChatSessionInfo {
   final DateTime updatedAt;
   final DateTime? lastActivatedAt;
   final int messageCount;
-  final int switchCount;
 
   const ChatSessionInfo({
     required this.id,
@@ -174,7 +173,6 @@ class ChatSessionInfo {
     required this.updatedAt,
     required this.lastActivatedAt,
     required this.messageCount,
-    required this.switchCount,
   });
 
   DateTime get sortTime => lastActivatedAt ?? updatedAt;
@@ -201,18 +199,6 @@ class GeneratedImageHistoryEntry {
     required this.size,
     required this.quality,
     required this.image,
-  });
-}
-
-class SessionSwitchLogEntry {
-  final int id;
-  final int sessionId;
-  final DateTime switchedAt;
-
-  const SessionSwitchLogEntry({
-    required this.id,
-    required this.sessionId,
-    required this.switchedAt,
   });
 }
 

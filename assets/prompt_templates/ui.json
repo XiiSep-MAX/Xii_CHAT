@@ -1,0 +1,32 @@
+{
+  "items": [
+    {
+      "title": "一句话生成 UI",
+      "summary": "适合快速产出 SaaS、网页和移动端界面风格稿。",
+      "source": "来源：ui case 1 · EvoLinkAI 仓库",
+      "prompt": "用这种风格帮我生成一套UI设计系统，包含网页、移动端、卡片、控件、按钮以及其它。",
+      "coverUrl": "https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts@main/images/ui_case1/output.jpg"
+    },
+    {
+      "title": "手写笔记照片",
+      "summary": "手机随手拍的手写笔记，适合仿真实拍信息卡片。",
+      "source": "来源：ui case 25 · EvoLinkAI 仓库",
+      "prompt": "Amateur photo of an open notebook lying flat, filled with handwritten notes in black ballpoint pen. The handwriting is casual and slightly messy, like personal notes, natural imperfections, crossed out words, underlined headings. Shot from slightly above, natural daylight from a window, no flash. Casual desk setting, shot on iPhone.",
+      "coverUrl": "https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts@main/images/ui_case25/output.jpg"
+    },
+    {
+      "title": "社交媒体截图",
+      "summary": "古今穿越的社媒 UI 模拟，适合做创意内容截图。",
+      "source": "来源：ui case 45 · EvoLinkAI 仓库",
+      "prompt": "“宋朝人的朋友圈” / “SONG DYNASTY SOCIAL MEDIA FEED”，古今穿越幽默融合界面设计风格，画面模拟手机社交媒体界面，但内容全部是宋朝场景，头像是宋代文人画像，用户名“苏东坡SuShi_Official”，发布内容“刚到黄州，被贬了但心情还行。今天自己做了东坡肉，味道绝了，附菜谱：”，配图为工笔画风格的东坡肉特写，点赞列表“黄庭坚、秦观、佛印等126人”，评论区“王安石：呵呵”“司马光：还是那个味道”，界面元素如点赞图标用宋代花纹替代，状态栏显示“大宋移动 5G”和“元丰三年”，配色为手机深色模式搭配宋代雅致色调。",
+      "coverUrl": "https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts@main/images/ui_case45/output.jpg"
+    },
+    {
+      "title": "广告 Banner 网格",
+      "summary": "2x2 广告横幅布局，适合商用创意和促销画面。",
+      "source": "来源：ad creative / ui case 90 · EvoLinkAI 仓库",
+      "prompt": "{ \"type\": \"2x2 grid of Japanese digital advertisement banners\", \"layout\": { \"structure\": \"4 equal quadrants\" } }",
+      "coverUrl": null
+    }
+  ]
+}

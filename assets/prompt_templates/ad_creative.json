@@ -1,0 +1,25 @@
+{
+  "items": [
+    {
+      "title": "四宫格广告横幅",
+      "summary": "旅游、护肤、美食、教育四宫格广告创意板。",
+      "source": "来源：ad creative / ui case 90 · EvoLinkAI 仓库",
+      "prompt": "{ \"type\": \"2x2 grid of Japanese digital advertisement banners\", \"layout\": { \"structure\": \"4 equal quadrants\" } }",
+      "coverUrl": "https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts@main/images/ui_case90/output.jpg"
+    },
+    {
+      "title": "品牌识别与周边板",
+      "summary": "适合做 IP 角色品牌化、KV 和延展物料展示。",
+      "source": "来源：ad creative / poster case 112 · EvoLinkAI 仓库",
+      "prompt": "Create a brand identity board for an anime character, including logo treatments, color palette, merch concepts, poster variants, packaging sketches, and polished key visuals in a unified commercial presentation layout.",
+      "coverUrl": "https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts@main/images/poster_case112/output.jpg"
+    },
+    {
+      "title": "商业产品广告版式",
+      "summary": "适合做强卖点、大标题和价格信息的营销画面。",
+      "source": "来源：ad creative case 170 · EvoLinkAI 仓库",
+      "prompt": "生成一张商业广告创意版式，突出主产品与卖点信息，保留清晰的标题区、价格区、功能标签区和品牌识别元素，整体风格高级、干净、有购买驱动力。",
+      "coverUrl": "https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts@main/images/ad_case170/output.jpg"
+    }
+  ]
+}

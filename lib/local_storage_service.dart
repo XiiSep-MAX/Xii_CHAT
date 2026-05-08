@@ -13,6 +13,8 @@ class LocalStorageService {
 
   static const _databaseName = 'xii_chat_local.db';
   static const _databaseVersion = 2;
+  static const _legacySwitchLogCleanupStateKey =
+      'legacy_session_switch_logs_cleaned_v1';
 
   Database? _database;
 
@@ -39,6 +41,8 @@ class LocalStorageService {
         },
       ),
     );
+
+    await _cleanupLegacySessionSwitchLogsIfNeeded();
   }
 
   Database get _db {
@@ -164,6 +168,25 @@ class LocalStorageService {
     );
   }
 
+  Future<void> _cleanupLegacySessionSwitchLogsIfNeeded() async {
+    final cleaned = await readAppState(_legacySwitchLogCleanupStateKey);
+    if (cleaned == 'true') {
+      return;
+    }
+
+    await _db.transaction((txn) async {
+      await txn.delete('session_switch_logs');
+      await txn.insert(
+        'app_state',
+        {
+          'key': _legacySwitchLogCleanupStateKey,
+          'value': 'true',
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    });
+  }
+
   Future<void> clearAllLocalData() async {
     await _db.transaction((txn) async {
       await txn.delete('generated_images');
@@ -204,11 +227,9 @@ class LocalStorageService {
         s.created_at,
         s.updated_at,
         s.last_activated_at,
-        COUNT(DISTINCT m.id) AS message_count,
-        COUNT(DISTINCT l.id) AS switch_count
+        COUNT(DISTINCT m.id) AS message_count
       FROM sessions s
       LEFT JOIN messages m ON m.session_id = s.id
-      LEFT JOIN session_switch_logs l ON l.session_id = s.id
       GROUP BY s.id
       ORDER BY COALESCE(s.last_activated_at, s.updated_at) DESC, s.id DESC
     ''');
@@ -229,11 +250,6 @@ class LocalStorageService {
       'last_activated_at': now,
     });
 
-    await _db.insert('session_switch_logs', {
-      'session_id': id,
-      'switched_at': now,
-    });
-
     return ChatSessionInfo(
       id: id,
       title: resolvedTitle,
@@ -241,7 +257,6 @@ class LocalStorageService {
       updatedAt: DateTime.parse(now),
       lastActivatedAt: DateTime.parse(now),
       messageCount: 0,
-      switchCount: 1,
     );
   }
 
@@ -339,10 +354,6 @@ class LocalStorageService {
         where: 'id = ?',
         whereArgs: [sessionId],
       );
-      await txn.insert('session_switch_logs', {
-        'session_id': sessionId,
-        'switched_at': now,
-      });
       await txn.insert(
         'app_state',
         {
@@ -529,29 +540,6 @@ class LocalStorageService {
     }).toList(growable: false);
   }
 
-  Future<List<SessionSwitchLogEntry>> loadSessionSwitchLogs({
-    int? sessionId,
-    int limit = 100,
-  }) async {
-    final rows = await _db.query(
-      'session_switch_logs',
-      where: sessionId == null ? null : 'session_id = ?',
-      whereArgs: sessionId == null ? null : [sessionId],
-      orderBy: 'switched_at DESC, id DESC',
-      limit: limit,
-    );
-
-    return rows
-        .map(
-          (row) => SessionSwitchLogEntry(
-            id: row['id'] as int,
-            sessionId: row['session_id'] as int,
-            switchedAt: DateTime.parse(row['switched_at'] as String),
-          ),
-        )
-        .toList(growable: false);
-  }
-
   ChatSessionInfo _mapSessionInfo(Map<String, Object?> row) {
     return ChatSessionInfo(
       id: row['id'] as int,
@@ -562,7 +550,6 @@ class LocalStorageService {
           ? null
           : DateTime.parse(row['last_activated_at'] as String),
       messageCount: _toInt(row['message_count']),
-      switchCount: _toInt(row['switch_count']),
     );
   }
 
