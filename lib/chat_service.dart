@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import 'env_config.dart';
 import 'license_service.dart';
@@ -97,22 +98,16 @@ class OpenAIChatService {
       throw Exception('请在环境变量或 .env 文件中填写可用的 API Key。');
     }
 
-    final response = await http.post(
-      Uri.parse('$_imageApiBaseUrl/images/generations'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $openAIApiKey',
-      },
-      body: jsonEncode({
-        'model': _model,
-        'prompt': composedPrompt,
-        'n': 1,
-        'size': options.size,
-        'quality': options.quality,
-        if (imageAttachments.isNotEmpty)
-          'image': imageAttachments.map(_buildDataUrl).toList(growable: false),
-      }),
-    );
+    final response = imageAttachments.isEmpty
+        ? await _sendGenerationRequest(
+            prompt: composedPrompt,
+            options: normalizedOptions,
+          )
+        : await _sendEditRequest(
+            prompt: composedPrompt,
+            options: normalizedOptions,
+            imageAttachments: imageAttachments,
+          );
 
     final body = _decodeJsonFromResponse(response);
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -129,6 +124,130 @@ class OpenAIChatService {
       options: normalizedOptions,
       isEditRequest: imageAttachments.isNotEmpty,
     );
+  }
+
+  Future<ChatResponse> editGeneratedImage({
+    required String prompt,
+    required ImageGenerationOptions options,
+    required ChatImageAttachment sourceImage,
+    ChatImageAttachment? maskImage,
+  }) async {
+    final normalizedOptions = options.normalized();
+    final composedPrompt = _composePrompt(
+      prompt: prompt,
+      options: normalizedOptions,
+      hasReferenceImage: true,
+    );
+
+    final workerBaseUrl = _workerBaseUrl;
+    if (workerBaseUrl != null && workerBaseUrl.isNotEmpty) {
+      return _sendEditViaWorker(
+        workerBaseUrl: workerBaseUrl,
+        prompt: prompt,
+        composedPrompt: composedPrompt,
+        options: normalizedOptions,
+        sourceImage: sourceImage,
+        maskImage: maskImage,
+      );
+    }
+
+    if (openAIApiKey.isEmpty || openAIApiKey == '<YOUR_OPENAI_API_KEY>') {
+      throw Exception('请在环境变量或 .env 文件中填写可用的 API Key。');
+    }
+
+    final response = await _sendEditRequest(
+      prompt: composedPrompt,
+      options: normalizedOptions,
+      imageAttachments: [sourceImage],
+      maskAttachment: maskImage,
+    );
+
+    final body = _decodeJsonFromResponse(response);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(_extractErrorMessage(response, body));
+    }
+
+    final content = _extractResponseContent(body);
+    if (content == null) {
+      throw Exception('无法解析 PackyAPI 响应。');
+    }
+
+    return _parseResponseContent(
+      content,
+      options: normalizedOptions,
+      isEditRequest: true,
+    );
+  }
+
+  Future<http.Response> _sendGenerationRequest({
+    required String prompt,
+    required ImageGenerationOptions options,
+  }) {
+    return http.post(
+      Uri.parse('$_imageApiBaseUrl/images/generations'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $openAIApiKey',
+      },
+      body: jsonEncode({
+        'model': _model,
+        'prompt': prompt,
+        'n': 1,
+        'size': options.size,
+        'quality': options.quality,
+        'output_format': 'png',
+        'response_format': 'url',
+      }),
+    );
+  }
+
+  Future<http.Response> _sendEditRequest({
+    required String prompt,
+    required ImageGenerationOptions options,
+    required List<ChatImageAttachment> imageAttachments,
+    ChatImageAttachment? maskAttachment,
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$_imageApiBaseUrl/images/edits'),
+    );
+
+    request.headers['Authorization'] = 'Bearer $openAIApiKey';
+    request.fields.addAll({
+      'model': _model,
+      'prompt': prompt,
+      'n': '1',
+      'size': options.size,
+      'quality': options.quality,
+      'output_format': 'png',
+      'response_format': 'url',
+      'input_fidelity': 'high',
+    });
+
+    for (final attachment in imageAttachments) {
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'image',
+          attachment.bytes,
+          filename: attachment.name,
+          contentType: _parseMediaType(attachment.mimeType),
+        ),
+      );
+    }
+
+    if (maskAttachment != null) {
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'mask',
+          maskAttachment.bytes,
+          filename: maskAttachment.name,
+          contentType: _parseMediaType(maskAttachment.mimeType),
+        ),
+      );
+    }
+
+    final streamed = await request.send();
+    return http.Response.fromStream(streamed);
   }
 
   Future<ChatResponse> _sendViaWorker({
@@ -176,6 +295,54 @@ class OpenAIChatService {
     );
   }
 
+  Future<ChatResponse> _sendEditViaWorker({
+    required String workerBaseUrl,
+    required String prompt,
+    required String composedPrompt,
+    required ImageGenerationOptions options,
+    required ChatImageAttachment sourceImage,
+    ChatImageAttachment? maskImage,
+  }) async {
+    final licenseStatus = await LicenseService.instance.initialize();
+    final response = await http.post(
+      Uri.parse('$workerBaseUrl/v1/chat/edit-image'),
+      headers: const {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'token': licenseStatus.licenseToken,
+        'installId': licenseStatus.installId,
+        'prompt': prompt,
+        'composedPrompt': composedPrompt,
+        'size': options.size,
+        'quality': options.quality,
+        'sourceImage': {
+          'name': sourceImage.name,
+          'mimeType': sourceImage.mimeType,
+          'bytesBase64': base64Encode(sourceImage.bytes),
+        },
+        if (maskImage != null)
+          'maskImage': {
+            'name': maskImage.name,
+            'mimeType': maskImage.mimeType,
+            'bytesBase64': base64Encode(maskImage.bytes),
+          },
+      }),
+    );
+
+    final body = _decodeJsonFromResponse(response);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(_extractErrorMessage(response, body));
+    }
+
+    final content = body['content'] ?? body['data'] ?? body;
+    return _parseResponseContent(
+      content,
+      options: options,
+      isEditRequest: true,
+    );
+  }
+
   String _composePrompt({
     required String prompt,
     required ImageGenerationOptions options,
@@ -190,9 +357,12 @@ class OpenAIChatService {
         '生成要求：尺寸 ${options.size}；质量 ${options.quality}。';
   }
 
-  String _buildDataUrl(ChatImageAttachment attachment) {
-    final encoded = base64Encode(attachment.bytes);
-    return 'data:${attachment.mimeType};base64,$encoded';
+  MediaType? _parseMediaType(String mimeType) {
+    final parts = mimeType.split('/');
+    if (parts.length != 2) {
+      return null;
+    }
+    return MediaType(parts.first, parts.last);
   }
 
   Map<String, dynamic> _decodeJsonFromResponse(http.Response response) {

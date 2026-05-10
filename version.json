@@ -1,11 +1,11 @@
 {
-  "version": "1.2.10",
-  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.10.zip",
+  "version": "1.2.11",
+  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.11.zip",
   "mirrorUrls": [
-    "https://github.com/XiiSep-MAX/Xii_CHAT/releases/download/v1.2.10/Xii_Raw_Graph_Trial_v1.2.10.zip"
+    "https://github.com/XiiSep-MAX/Xii_CHAT/releases/download/v1.2.11/Xii_Raw_Graph_Trial_v1.2.11.zip"
   ],
-  "sha256": "15d3a08ef69e4a2da8da5dc44c05eeb0e9543c5e89758b6cc8caa3794764c980",
-  "releaseNotes": "🎨 1.2.10 交互与模板库增强版\n\n本次更新包含：\n- 参考图上传支持追加、多图去重与桌面拖拽\n- 提示词模板库升级为分类案例库并改为远程图懒加载\n- 会话切换次数与切换记录功能下线，界面更简洁\n- 输入工作台与主界面布局继续优化",
+  "sha256": "d1eaa887a0e4982bb9e8774e91af4ac40218806530a6c25137d965b56c17ccdd",
+  "releaseNotes": "🎨 1.2.11 图像编辑与交互稳定性增强版\n\n本次更新包含：\n- 图生图链路按 Packy 文档调整，文生图与图生图能力对齐\n- 生成图新增扩图与区域重绘入口，支持独立编辑页体验\n- 区域重绘编辑器优化为后台缩略预览、轻量画笔与可视笔刷圆环\n- 输入工作台、模板库与参考图交互继续优化",
   "isForced": false,
-  "signature": "NSYn7qI37y9mjrlgPBGYJmkFO2WOu1hGxXtPeMNiSVfUk09I+kHwBbWsHD/0W6SJgMoaEMSy4pJ+C3B9AOkxBg=="
+  "signature": "hREgK+pwNMaiUWW8VsUo/nKH6qziNive/2vmPzmUmzw7so7BvZEVv6WQU4tEwDheiw8cXQYaiT8OCJeYwDzGAQ=="
 }

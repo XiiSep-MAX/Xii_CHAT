@@ -136,6 +136,10 @@ export default {
         return await handleGenerate(request, env);
       }
 
+      if (request.method === "POST" && url.pathname === "/v1/chat/edit-image") {
+        return await handleEditImage(request, env);
+      }
+
       return json(
         {
           error: "Not found",
@@ -906,14 +910,14 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
   const installIdHash = await sha256Hex(installId);
   const safetyResult = evaluateSafety({
     prompt,
-    hasReferenceImage: referenceImages.isNotEmpty,
+    hasReferenceImage: referenceImages.length > 0,
   });
   if (!safetyResult.allowed) {
     await appendSafetyEvent(env, {
       category: "generation_blocked",
       safetyCode: safetyResult.code,
       prompt: prompt,
-      hasReferenceImage: referenceImages.isNotEmpty,
+      hasReferenceImage: referenceImages.length > 0,
       installIdHash,
       payload: {
         size: requestSize,
@@ -952,26 +956,28 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
     n: 1,
     size: requestSize,
     quality: requestQuality,
-    ...(referenceImages.length === 0
-      ? {}
-      : {
-          image: referenceImages.map(
-            (image) =>
-              `data:${image.mimeType ?? "image/png"};base64,${image.bytesBase64}`,
-          ),
-        }),
   };
 
-  const upstreamUrl = resolveImageApiUrl(env.UPSTREAM_BASE_URL);
-
-  const upstreamResponse = await fetch(upstreamUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify(upstreamBody),
-  });
+  const upstreamResponse =
+    referenceImages.length === 0
+      ? await fetch(resolveImageGenerationsApiUrl(env.UPSTREAM_BASE_URL), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            ...upstreamBody,
+            output_format: "png",
+            response_format: "url",
+          }),
+        })
+      : await sendImageEditRequest(env, {
+          prompt,
+          size: requestSize,
+          quality: requestQuality,
+          referenceImages,
+        });
 
   const upstreamText = await upstreamResponse.text();
   const payloadJson = safeParseJson(upstreamText);
@@ -1034,7 +1040,7 @@ function evaluateSafety(input: {
   };
 }
 
-function resolveImageApiUrl(baseUrl: string) {
+function resolveImageGenerationsApiUrl(baseUrl: string) {
   const trimmed = baseUrl.replace(/\/+$/, "");
   if (trimmed.endsWith("/chat/completions")) {
     const apiRoot = trimmed.slice(0, -"/chat/completions".length);
@@ -1044,6 +1050,192 @@ function resolveImageApiUrl(baseUrl: string) {
     return `${trimmed}/images/generations`;
   }
   return `${trimmed}/v1/images/generations`;
+}
+
+async function handleEditImage(request: Request, env: Env): Promise<Response> {
+  const body = (await request.json()) as {
+    token?: string | null;
+    installId?: string;
+    prompt?: string;
+    composedPrompt?: string;
+    size?: string;
+    quality?: string;
+    sourceImage?: {
+      mimeType?: string;
+      bytesBase64?: string;
+      name?: string;
+    } | null;
+    maskImage?: {
+      mimeType?: string;
+      bytesBase64?: string;
+      name?: string;
+    } | null;
+  };
+
+  const installId = (body.installId ?? "").trim();
+  const prompt = (body.composedPrompt ?? body.prompt ?? "").trim();
+  const requestSize = body.size?.trim().toLowerCase() || "auto";
+  const requestQuality = normalizeQuality(body.quality);
+  const sourceImage = body.sourceImage;
+  const maskImage = body.maskImage;
+
+  if (!installId || !prompt || !sourceImage?.bytesBase64?.trim()) {
+    return json({ error: "缺少必要请求参数。" }, 400);
+  }
+
+  const installIdHash = await sha256Hex(installId);
+  const safetyResult = evaluateSafety({
+    prompt,
+    hasReferenceImage: true,
+  });
+  if (!safetyResult.allowed) {
+    await appendSafetyEvent(env, {
+      category: "image_edit_blocked",
+      safetyCode: safetyResult.code,
+      prompt: prompt,
+      hasReferenceImage: true,
+      installIdHash,
+      payload: {
+        size: requestSize,
+        quality: requestQuality,
+        hasMask: !!maskImage?.bytesBase64?.trim(),
+      },
+    });
+    return json(
+      {
+        error: SAFETY_BLOCK_MESSAGE,
+        safetyCode: safetyResult.code,
+      },
+      400,
+    );
+  }
+
+  const token = (body.token ?? "").trim();
+  if (!token) {
+    return json({ error: "请先激活高级功能后再调用生成接口。" }, 403);
+  }
+
+  const payload = await verifyLicenseToken(env, token);
+  if (payload.installIdHash !== installIdHash) {
+    return json({ error: "当前授权与设备不匹配。" }, 403);
+  }
+
+  const license = await loadLicenseById(env, payload.licenseId);
+  if (!license) {
+    return json({ error: "授权记录不存在。" }, 404);
+  }
+  validateLicenseAvailability(license);
+
+  const upstreamResponse = await sendImageEditRequest(env, {
+    prompt,
+    size: requestSize,
+    quality: requestQuality,
+    referenceImages: [sourceImage],
+    maskImage: maskImage?.bytesBase64?.trim() ? maskImage : null,
+  });
+
+  const upstreamText = await upstreamResponse.text();
+  const payloadJson = safeParseJson(upstreamText);
+  if (!upstreamResponse.ok) {
+    const upstreamError = describeUpstreamError(
+      upstreamResponse.status,
+      payloadJson,
+      upstreamText,
+    );
+    return json(
+      {
+        error: upstreamError.message,
+        upstreamStatus: upstreamResponse.status,
+        upstreamDetail: upstreamError.detail,
+      },
+      upstreamResponse.status,
+    );
+  }
+
+  await appendEvent(env, license.id, "edit_image", {
+    size: requestSize,
+    quality: requestQuality,
+    hasMask: !!maskImage?.bytesBase64?.trim(),
+  });
+
+  return json({
+    content: payloadJson?.data ?? payloadJson?.choices?.[0]?.message?.content ?? payloadJson,
+  });
+}
+
+function resolveImageEditsApiUrl(baseUrl: string) {
+  const trimmed = baseUrl.replace(/\/+$/, "");
+  if (trimmed.endsWith("/chat/completions")) {
+    const apiRoot = trimmed.slice(0, -"/chat/completions".length);
+    return `${apiRoot}/images/edits`;
+  }
+  if (trimmed.endsWith("/v1")) {
+    return `${trimmed}/images/edits`;
+  }
+  return `${trimmed}/v1/images/edits`;
+}
+
+async function sendImageEditRequest(
+  env: Env,
+  input: {
+    prompt: string;
+    size: string;
+    quality: string;
+    referenceImages: Array<{
+      mimeType?: string;
+      bytesBase64?: string;
+      name?: string;
+    }>;
+    maskImage?: {
+      mimeType?: string;
+      bytesBase64?: string;
+      name?: string;
+    } | null;
+  },
+) {
+  const form = new FormData();
+  form.set("model", env.UPSTREAM_MODEL || "gpt-image-2");
+  form.set("prompt", input.prompt);
+  form.set("n", "1");
+  form.set("size", input.size);
+  form.set("quality", input.quality);
+  form.set("output_format", "png");
+  form.set("response_format", "url");
+  form.set("input_fidelity", "high");
+
+  input.referenceImages.forEach((image, index) => {
+    const mimeType = image.mimeType ?? "image/png";
+    const bytesBase64 = image.bytesBase64 ?? "";
+    const bytes = Uint8Array.from(atob(bytesBase64), (char) =>
+      char.charCodeAt(0),
+    );
+    const blob = new Blob([bytes], { type: mimeType });
+    const extension = mimeType.split("/")[1] || "png";
+    const fallbackName = `reference-${index + 1}.${extension}`;
+    form.append("image", blob, image.name?.trim() || fallbackName);
+  });
+
+  if (input.maskImage?.bytesBase64?.trim()) {
+    const mimeType = input.maskImage.mimeType ?? "image/png";
+    const bytes = Uint8Array.from(atob(input.maskImage.bytesBase64), (char) =>
+      char.charCodeAt(0),
+    );
+    const blob = new Blob([bytes], { type: mimeType });
+    const extension = mimeType.split("/")[1] || "png";
+    form.append(
+      "mask",
+      blob,
+      input.maskImage.name?.trim() || `mask.${extension}`,
+    );
+  }
+
+  return fetch(resolveImageEditsApiUrl(env.UPSTREAM_BASE_URL), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+    },
+    body: form,
+  });
 }
 
 function mapAspectRatioToSize(aspectRatio?: string | null) {
@@ -1567,7 +1759,7 @@ function describeUpstreamError(
   }
 
   const detail = detailParts.join(" | ");
-  if (detail.isNotEmpty) {
+  if (detail.length > 0) {
     message = `${message} (${detail})`;
   }
 

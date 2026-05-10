@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:crypto/crypto.dart';
@@ -9,6 +11,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:image/image.dart' as img;
 
 import 'chat_service.dart';
 import 'download_helper.dart';
@@ -21,6 +25,102 @@ import 'update_service.dart';
 void main() {
   EnvConfig.load();
   runApp(const AIChatApp());
+}
+
+class _OutpaintRequest {
+  final String prompt;
+  final double leftRatio;
+  final double rightRatio;
+  final double topRatio;
+  final double bottomRatio;
+
+  const _OutpaintRequest({
+    required this.prompt,
+    required this.leftRatio,
+    required this.rightRatio,
+    required this.topRatio,
+    required this.bottomRatio,
+  });
+}
+
+class _PreparedEditImages {
+  final ChatImageAttachment sourceImage;
+  final ChatImageAttachment maskImage;
+
+  const _PreparedEditImages({
+    required this.sourceImage,
+    required this.maskImage,
+  });
+}
+
+class _SourceImageInfo {
+  final ChatImageAttachment attachment;
+  final int width;
+  final int height;
+
+  const _SourceImageInfo({
+    required this.attachment,
+    required this.width,
+    required this.height,
+  });
+}
+
+class _InpaintRequest {
+  final String prompt;
+  final List<Offset> normalizedPoints;
+  final double normalizedBrushRadius;
+
+  const _InpaintRequest({
+    required this.prompt,
+    required this.normalizedPoints,
+    required this.normalizedBrushRadius,
+  });
+}
+
+class _PreviewThumbnailData {
+  final Uint8List bytes;
+  final int width;
+  final int height;
+
+  const _PreviewThumbnailData({
+    required this.bytes,
+    required this.width,
+    required this.height,
+  });
+
+  double get aspectRatio => height == 0 ? 1 : width / height;
+}
+
+class _PreviewThumbnailJob {
+  final Uint8List bytes;
+  final int targetWidth;
+
+  const _PreviewThumbnailJob({
+    required this.bytes,
+    required this.targetWidth,
+  });
+}
+
+_PreviewThumbnailData? _buildPreviewThumbnailBytes(_PreviewThumbnailJob job) {
+  final decoded = img.decodeImage(job.bytes);
+  if (decoded == null) {
+    return null;
+  }
+
+  final resized = decoded.width > job.targetWidth
+      ? img.copyResize(decoded, width: job.targetWidth)
+      : decoded;
+
+  return _PreviewThumbnailData(
+    bytes: Uint8List.fromList(
+      img.encodeJpg(
+        resized,
+        quality: 84,
+      ),
+    ),
+    width: resized.width,
+    height: resized.height,
+  );
 }
 
 class AIChatApp extends StatelessWidget {
@@ -176,7 +276,7 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  static const String _appVersion = '1.2.10';
+  static const String _appVersion = '1.2.11';
   static const String _privacyAcknowledgedKey = 'privacy_acknowledged_v1';
   static const String _retainReferenceImagesKey = 'retain_reference_images_v1';
   static const String _contactWechatId = '123456';
@@ -1681,6 +1781,407 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _handleOutpaintFromGeneratedImage(
+    GeneratedImageAsset image,
+  ) async {
+    final activeSession = _activeSession;
+    var licenseStatus = _licenseStatus ?? await _licenseService.initialize();
+    if (activeSession == null) {
+      return;
+    }
+    if (_isSending) {
+      _showSnackBar('当前正在生成图片，请稍后再编辑。');
+      return;
+    }
+    if (!image.hasBytes && !image.hasUrl) {
+      _showSnackBar('当前图片暂时无法用于扩图。');
+      return;
+    }
+
+    if (!licenseStatus.canUseGeneration) {
+      await _showActivationDialog();
+      licenseStatus = _licenseStatus ?? await _licenseService.initialize();
+      if (!licenseStatus.canUseGeneration) {
+        return;
+      }
+    }
+
+    final request = await showDialog<_OutpaintRequest>(
+      context: context,
+      builder: (dialogContext) => const _OutpaintConfigDialog(),
+    );
+    if (request == null) {
+      return;
+    }
+
+    final localSafetyMessage = _evaluateLocalSafety(
+      text: request.prompt,
+      hasReferenceImage: true,
+    );
+    if (localSafetyMessage != null) {
+      _showSnackBar(localSafetyMessage);
+      return;
+    }
+
+    try {
+      setState(() {
+        _isSending = true;
+      });
+
+      final sourceInfo = await _loadGeneratedImageInfo(image);
+      if (sourceInfo == null) {
+        throw Exception('无法读取原图内容。');
+      }
+
+      final prepared = await _prepareOutpaintImages(
+        sourceInfo: sourceInfo,
+        leftRatio: request.leftRatio,
+        rightRatio: request.rightRatio,
+        topRatio: request.topRatio,
+        bottomRatio: request.bottomRatio,
+      );
+
+      final response = await _chatService.editGeneratedImage(
+        prompt: request.prompt,
+        options: _generationOptions.normalized(),
+        sourceImage: prepared.sourceImage,
+        maskImage: prepared.maskImage,
+      );
+
+      if (!licenseStatus.isPremium) {
+        licenseStatus = await _licenseService.consumeTrialUse();
+      } else {
+        licenseStatus = await _licenseService.refreshLicenseStatus();
+      }
+
+      final botMessage = ChatMessage(
+        text: response.text,
+        role: Role.bot,
+        generatedImages: response.generatedImages,
+        generationOptions: _generationOptions.normalized(),
+      );
+      final savedBotMessage = await _storageService.saveMessage(
+        sessionId: activeSession.id,
+        message: botMessage,
+      );
+      final sessions = await _storageService.loadSessions();
+      final history = await _storageService.loadGeneratedImageHistory();
+      final refreshedActiveSession =
+          _findSessionById(sessions, activeSession.id) ?? activeSession;
+
+      if (!mounted) return;
+      setState(() {
+        _licenseStatus = licenseStatus;
+        _messages.add(savedBotMessage);
+        _sessions
+          ..clear()
+          ..addAll(sessions);
+        _generatedImageHistory
+          ..clear()
+          ..addAll(history);
+        _activeSession = refreshedActiveSession;
+      });
+      _scrollToBottom();
+      _showSnackBar('扩图已完成。');
+    } catch (e) {
+      if (!mounted) return;
+      _showErrorDialog('扩图失败：$e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
+      }
+    }
+  }
+
+  Future<_SourceImageInfo?> _loadGeneratedImageInfo(
+    GeneratedImageAsset image,
+  ) async {
+    ChatImageAttachment? attachment;
+    if (image.hasBytes) {
+      attachment = ChatImageAttachment(
+        bytes: image.bytes!,
+        name: image.fileName,
+        mimeType: image.mimeType,
+      );
+    } else if (image.hasUrl) {
+      final response = await http.get(Uri.parse(image.imageUrl!));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('下载原图失败：HTTP ${response.statusCode}');
+      }
+
+      attachment = ChatImageAttachment(
+        bytes: response.bodyBytes,
+        name: image.fileName,
+        mimeType: image.mimeType,
+      );
+    }
+
+    if (attachment == null) {
+      return null;
+    }
+
+    final codec = await ui.instantiateImageCodec(attachment.bytes);
+    final frame = await codec.getNextFrame();
+    final uiImage = frame.image;
+    return _SourceImageInfo(
+      attachment: attachment,
+      width: uiImage.width,
+      height: uiImage.height,
+    );
+  }
+
+  Future<_PreparedEditImages> _prepareOutpaintImages({
+    required _SourceImageInfo sourceInfo,
+    required double leftRatio,
+    required double rightRatio,
+    required double topRatio,
+    required double bottomRatio,
+  }) async {
+    final codec = await ui.instantiateImageCodec(sourceInfo.attachment.bytes);
+    final frame = await codec.getNextFrame();
+    final originalImage = frame.image;
+
+    final sourceWidth = sourceInfo.width;
+    final sourceHeight = sourceInfo.height;
+    final leftExtra = leftRatio <= 0
+        ? 0
+        : (sourceWidth * leftRatio).round().clamp(64, 1536);
+    final rightExtra = rightRatio <= 0
+        ? 0
+        : (sourceWidth * rightRatio).round().clamp(64, 1536);
+    final topExtra = topRatio <= 0
+        ? 0
+        : (sourceHeight * topRatio).round().clamp(64, 1536);
+    final bottomExtra = bottomRatio <= 0
+        ? 0
+        : (sourceHeight * bottomRatio).round().clamp(64, 1536);
+
+    final canvasWidth = sourceWidth + leftExtra + rightExtra;
+    final canvasHeight = sourceHeight + topExtra + bottomExtra;
+
+    final offset = Offset(leftExtra.toDouble(), topExtra.toDouble());
+
+    final sourceRecorder = ui.PictureRecorder();
+    final sourceCanvas = Canvas(sourceRecorder);
+    sourceCanvas.drawRect(
+      Rect.fromLTWH(0, 0, canvasWidth.toDouble(), canvasHeight.toDouble()),
+      Paint()..color = Colors.white,
+    );
+    sourceCanvas.drawImage(originalImage, offset, Paint());
+    final sourcePicture = sourceRecorder.endRecording();
+    final expandedImage =
+        await sourcePicture.toImage(canvasWidth, canvasHeight);
+    final expandedBytes = await expandedImage.toByteData(
+      format: ui.ImageByteFormat.png,
+    );
+
+    final maskRecorder = ui.PictureRecorder();
+    final maskCanvas = Canvas(maskRecorder);
+    maskCanvas.drawRect(
+      Rect.fromLTWH(0, 0, canvasWidth.toDouble(), canvasHeight.toDouble()),
+      Paint()..color = Colors.transparent,
+    );
+    maskCanvas.drawRect(
+      Rect.fromLTWH(
+        offset.dx,
+        offset.dy,
+        sourceWidth.toDouble(),
+        sourceHeight.toDouble(),
+      ),
+      Paint()..color = Colors.white,
+    );
+    final maskPicture = maskRecorder.endRecording();
+    final maskUiImage = await maskPicture.toImage(canvasWidth, canvasHeight);
+    final maskBytes = await maskUiImage.toByteData(
+      format: ui.ImageByteFormat.png,
+    );
+
+    if (expandedBytes == null || maskBytes == null) {
+      throw Exception('生成扩图画布失败。');
+    }
+
+    return _PreparedEditImages(
+      sourceImage: ChatImageAttachment(
+        bytes: expandedBytes.buffer.asUint8List(),
+        name: 'outpaint_source.png',
+        mimeType: 'image/png',
+      ),
+      maskImage: ChatImageAttachment(
+        bytes: maskBytes.buffer.asUint8List(),
+        name: 'outpaint_mask.png',
+        mimeType: 'image/png',
+      ),
+    );
+  }
+
+  Future<void> _handleInpaintFromGeneratedImage(
+    GeneratedImageAsset image,
+  ) async {
+    final activeSession = _activeSession;
+    var licenseStatus = _licenseStatus ?? await _licenseService.initialize();
+    if (activeSession == null) {
+      return;
+    }
+    if (_isSending) {
+      _showSnackBar('当前正在生成图片，请稍后再编辑。');
+      return;
+    }
+
+    if (!licenseStatus.canUseGeneration) {
+      await _showActivationDialog();
+      licenseStatus = _licenseStatus ?? await _licenseService.initialize();
+      if (!licenseStatus.canUseGeneration) {
+        return;
+      }
+    }
+
+    final request = await Navigator.of(context).push<_InpaintRequest>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (pageContext) => _InpaintEditorPage(
+          image: image,
+        ),
+      ),
+    );
+    if (request == null) {
+      return;
+    }
+
+    final localSafetyMessage = _evaluateLocalSafety(
+      text: request.prompt,
+      hasReferenceImage: true,
+    );
+    if (localSafetyMessage != null) {
+      _showSnackBar(localSafetyMessage);
+      return;
+    }
+
+    try {
+      setState(() {
+        _isSending = true;
+      });
+
+      final sourceInfo = await _loadGeneratedImageInfo(image);
+      if (sourceInfo == null) {
+        throw Exception('无法读取原图内容。');
+      }
+
+      final maskAttachment = await _buildInpaintMask(
+        sourceInfo: sourceInfo,
+        normalizedPoints: request.normalizedPoints,
+        normalizedBrushRadius: request.normalizedBrushRadius,
+      );
+
+      final response = await _chatService.editGeneratedImage(
+        prompt: request.prompt,
+        options: _generationOptions.normalized(),
+        sourceImage: sourceInfo.attachment,
+        maskImage: maskAttachment,
+      );
+
+      if (!licenseStatus.isPremium) {
+        licenseStatus = await _licenseService.consumeTrialUse();
+      } else {
+        licenseStatus = await _licenseService.refreshLicenseStatus();
+      }
+
+      final botMessage = ChatMessage(
+        text: response.text,
+        role: Role.bot,
+        generatedImages: response.generatedImages,
+        generationOptions: _generationOptions.normalized(),
+      );
+      final savedBotMessage = await _storageService.saveMessage(
+        sessionId: activeSession.id,
+        message: botMessage,
+      );
+      final sessions = await _storageService.loadSessions();
+      final history = await _storageService.loadGeneratedImageHistory();
+      final refreshedActiveSession =
+          _findSessionById(sessions, activeSession.id) ?? activeSession;
+
+      if (!mounted) return;
+      setState(() {
+        _licenseStatus = licenseStatus;
+        _messages.add(savedBotMessage);
+        _sessions
+          ..clear()
+          ..addAll(sessions);
+        _generatedImageHistory
+          ..clear()
+          ..addAll(history);
+        _activeSession = refreshedActiveSession;
+      });
+      _scrollToBottom();
+      _showSnackBar('局部重绘已完成。');
+    } catch (e) {
+      if (!mounted) return;
+      _showErrorDialog('局部重绘失败：$e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
+      }
+    }
+  }
+
+  Future<ChatImageAttachment> _buildInpaintMask({
+    required _SourceImageInfo sourceInfo,
+    required List<Offset> normalizedPoints,
+    required double normalizedBrushRadius,
+  }) async {
+    final width = sourceInfo.width;
+    final height = sourceInfo.height;
+    final brushRadius =
+        (normalizedBrushRadius * width).clamp(8.0, width * 0.2);
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+      Paint()..color = Colors.white,
+    );
+    final erasePaint = Paint()
+      ..color = Colors.transparent
+      ..blendMode = BlendMode.clear
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = brushRadius * 2;
+    if (normalizedPoints.length == 1) {
+      final point = Offset(
+        normalizedPoints.first.dx * width,
+        normalizedPoints.first.dy * height,
+      );
+      canvas.drawCircle(point, brushRadius, erasePaint);
+    } else if (normalizedPoints.length > 1) {
+      final path = Path()
+        ..moveTo(
+          normalizedPoints.first.dx * width,
+          normalizedPoints.first.dy * height,
+        );
+      for (final point in normalizedPoints.skip(1)) {
+        path.lineTo(point.dx * width, point.dy * height);
+      }
+      canvas.drawPath(path, erasePaint);
+    }
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(width, height);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (bytes == null) {
+      throw Exception('生成区域重绘蒙版失败。');
+    }
+
+    return ChatImageAttachment(
+      bytes: bytes.buffer.asUint8List(),
+      name: 'inpaint_mask.png',
+      mimeType: 'image/png',
+    );
+  }
+
   String? _evaluateLocalSafety({
     required String text,
     required bool hasReferenceImage,
@@ -1966,6 +2467,8 @@ class _ChatScreenState extends State<ChatScreen> {
                           key: ValueKey(message.id ?? message.createdAt),
                           message: message,
                           isNew: index == _messages.length - 1 && !_isSending,
+                          onOutpaintImage: _handleOutpaintFromGeneratedImage,
+                          onInpaintImage: _handleInpaintFromGeneratedImage,
                         ),
                       ),
                     );
@@ -3231,11 +3734,15 @@ class _GeneratedImageHistorySheet extends StatelessWidget {
 class AnimatedMessageBubble extends StatefulWidget {
   final ChatMessage message;
   final bool isNew;
+  final ValueChanged<GeneratedImageAsset> onOutpaintImage;
+  final ValueChanged<GeneratedImageAsset> onInpaintImage;
 
   const AnimatedMessageBubble({
     super.key,
     required this.message,
     this.isNew = false,
+    required this.onOutpaintImage,
+    required this.onInpaintImage,
   });
 
   @override
@@ -3295,7 +3802,11 @@ class _AnimatedMessageBubbleState extends State<AnimatedMessageBubble>
       position: _slideAnimation,
       child: FadeTransition(
         opacity: _opacityAnimation,
-        child: ChatBubble(message: widget.message),
+        child: ChatBubble(
+          message: widget.message,
+          onOutpaintImage: widget.onOutpaintImage,
+          onInpaintImage: widget.onInpaintImage,
+        ),
       ),
     );
   }
@@ -3303,8 +3814,15 @@ class _AnimatedMessageBubbleState extends State<AnimatedMessageBubble>
 
 class ChatBubble extends StatelessWidget {
   final ChatMessage message;
+  final ValueChanged<GeneratedImageAsset> onOutpaintImage;
+  final ValueChanged<GeneratedImageAsset> onInpaintImage;
 
-  const ChatBubble({super.key, required this.message});
+  const ChatBubble({
+    super.key,
+    required this.message,
+    required this.onOutpaintImage,
+    required this.onInpaintImage,
+  });
 
   void _copyMessageText(BuildContext context, String text) {
     Clipboard.setData(ClipboardData(text: text));
@@ -3316,7 +3834,11 @@ class ChatBubble extends StatelessWidget {
     );
   }
 
-  void _showImagePreview(BuildContext context, Widget image) {
+  void _showImagePreview(
+    BuildContext context,
+    Widget image, {
+    GeneratedImageAsset? editableImage,
+  }) {
     showGeneralDialog<void>(
       context: context,
       barrierLabel: '关闭图片预览',
@@ -3324,7 +3846,43 @@ class ChatBubble extends StatelessWidget {
       barrierColor: Colors.black.withOpacity(0.9),
       transitionDuration: const Duration(milliseconds: 220),
       pageBuilder: (context, animation, secondaryAnimation) {
-        return _ImagePreviewDialog(image: image);
+        return _ImagePreviewDialog(
+          image: image,
+          onOutpaint: editableImage == null
+              ? null
+              : () {
+                  Navigator.of(context).pop();
+                  onOutpaintImage(editableImage);
+                },
+          onInpaint: editableImage == null
+              ? null
+              : () async {
+                  final shouldOpen = await showDialog<bool>(
+                    context: context,
+                    builder: (dialogContext) => AlertDialog(
+                      title: const Text('区域重绘'),
+                      content: const Text(
+                        '该功能仍在优化中，部分大图可能出现卡顿。是否继续进入区域重绘？',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(false),
+                          child: const Text('取消'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(true),
+                          child: const Text('继续'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (shouldOpen != true) {
+                    return;
+                  }
+                  Navigator.of(context).pop();
+                  onInpaintImage(editableImage);
+                },
+        );
       },
       transitionBuilder: (context, animation, secondaryAnimation, child) {
         return FadeTransition(
@@ -3483,6 +4041,7 @@ class ChatBubble extends StatelessWidget {
                                   image,
                                   fit: BoxFit.contain,
                                 ),
+                                editableImage: image,
                               ),
                               child: _buildGeneratedImageWidget(
                                 image,
@@ -3562,6 +4121,7 @@ class ChatBubble extends StatelessWidget {
                                     image,
                                     fit: BoxFit.contain,
                                   ),
+                                  editableImage: image,
                                 ),
                                 child: _buildGeneratedImageWidget(
                                   image,
@@ -4206,8 +4766,14 @@ class _ChatImageFrame extends StatelessWidget {
 
 class _ImagePreviewDialog extends StatelessWidget {
   final Widget image;
+  final VoidCallback? onOutpaint;
+  final VoidCallback? onInpaint;
 
-  const _ImagePreviewDialog({required this.image});
+  const _ImagePreviewDialog({
+    required this.image,
+    this.onOutpaint,
+    this.onInpaint,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -4246,19 +4812,82 @@ class _ImagePreviewDialog extends StatelessWidget {
             top: 16,
             right: 16,
             child: SafeArea(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.45),
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  tooltip: '关闭预览',
-                  icon: const Icon(
-                    Icons.close_rounded,
-                    color: Colors.white,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (onInpaint != null)
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.45),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: TextButton.icon(
+                        onPressed: onInpaint,
+                        icon: const Icon(
+                          Icons.brush_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                        label: const Text(
+                          '区域重绘',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (onInpaint != null) const SizedBox(width: 10),
+                  if (onOutpaint != null)
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.45),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: TextButton.icon(
+                        onPressed: onOutpaint,
+                        icon: const Icon(
+                          Icons.open_in_full_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                        label: const Text(
+                          '扩图',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (onOutpaint != null) const SizedBox(width: 10),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.45),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      tooltip: '关闭预览',
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
@@ -4294,6 +4923,872 @@ class _ImagePreviewDialog extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _OutpaintConfigDialog extends StatefulWidget {
+  const _OutpaintConfigDialog();
+
+  @override
+  State<_OutpaintConfigDialog> createState() => _OutpaintConfigDialogState();
+}
+
+class _OutpaintConfigDialogState extends State<_OutpaintConfigDialog> {
+  final TextEditingController _promptController = TextEditingController();
+  double _leftRatio = 0;
+  double _rightRatio = 0.35;
+  double _topRatio = 0;
+  double _bottomRatio = 0;
+
+  @override
+  void dispose() {
+    _promptController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final maxHeight = MediaQuery.of(context).size.height * 0.72;
+    const previewBaseWidth = 280.0;
+    const previewBaseHeight = 180.0;
+    final previewLeft = previewBaseWidth * _leftRatio;
+    final previewRight = previewBaseWidth * _rightRatio;
+    final previewTop = previewBaseHeight * _topRatio;
+    final previewBottom = previewBaseHeight * _bottomRatio;
+    return AlertDialog(
+      title: const Text('扩图'),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 440, maxHeight: maxHeight),
+        child: SingleChildScrollView(
+          child: SizedBox(
+            width: 440,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _promptController,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: '扩图描述',
+                    hintText: '例如：向右扩展窗外风景，并在顶部补一些云层',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  '四边扩展比例',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Center(
+                  child: Container(
+                    width: previewBaseWidth + previewLeft + previewRight,
+                    height: previewBaseHeight + previewTop + previewBottom,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outline
+                            .withValues(alpha: 0.18),
+                      ),
+                    ),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              color: const Color(0xFFE0E7FF),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          left: previewLeft,
+                          top: previewTop,
+                          width: previewBaseWidth,
+                          height: previewBaseHeight,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: const Color(0xFF2563EB),
+                                width: 1.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: const Center(
+                              child: Text(
+                                '原图区域',
+                                style: TextStyle(
+                                  color: Color(0xFF2563EB),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildRatioSlider(
+                  context,
+                  label: '左侧',
+                  value: _leftRatio,
+                  onChanged: (value) => setState(() => _leftRatio = value),
+                ),
+                _buildRatioSlider(
+                  context,
+                  label: '右侧',
+                  value: _rightRatio,
+                  onChanged: (value) => setState(() => _rightRatio = value),
+                ),
+                _buildRatioSlider(
+                  context,
+                  label: '上方',
+                  value: _topRatio,
+                  onChanged: (value) => setState(() => _topRatio = value),
+                ),
+                _buildRatioSlider(
+                  context,
+                  label: '下方',
+                  value: _bottomRatio,
+                  onChanged: (value) => setState(() => _bottomRatio = value),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final prompt = _promptController.text.trim();
+            if (prompt.isEmpty) {
+              return;
+            }
+            Navigator.of(context).pop(
+              _OutpaintRequest(
+                prompt: prompt,
+                leftRatio: _leftRatio,
+                rightRatio: _rightRatio,
+                topRatio: _topRatio,
+                bottomRatio: _bottomRatio,
+              ),
+            );
+          },
+          child: const Text('开始扩图'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRatioSlider(
+    BuildContext context, {
+    required String label,
+    required double value,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$label ${(value * 100).round()}%',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Slider(
+            value: value,
+            min: 0,
+            max: 0.7,
+            divisions: 14,
+            label: '${(value * 100).round()}%',
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InpaintEditorPage extends StatefulWidget {
+  final GeneratedImageAsset image;
+
+  const _InpaintEditorPage({
+    required this.image,
+  });
+
+  @override
+  State<_InpaintEditorPage> createState() => _InpaintEditorPageState();
+}
+
+class _InpaintEditorPageState extends State<_InpaintEditorPage> {
+  final TextEditingController _promptController = TextEditingController();
+  final List<Offset> _strokePoints = [];
+  Size? _previewSize;
+  Rect? _imageViewportRect;
+  bool _isDrawing = false;
+  double _brushRadius = 18;
+  Offset? _lastStrokePoint;
+  Offset? _hoverPoint;
+  late final Future<_PreviewThumbnailData?> _previewBytesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _previewBytesFuture = _preparePreviewBytes();
+  }
+
+  @override
+  void dispose() {
+    _promptController.dispose();
+    super.dispose();
+  }
+
+  Future<_PreviewThumbnailData?> _preparePreviewBytes() async {
+    try {
+      Uint8List sourceBytes;
+      if (widget.image.hasBytes) {
+        sourceBytes = widget.image.bytes!;
+      } else if (widget.image.hasUrl) {
+        final response = await http.get(Uri.parse(widget.image.imageUrl!));
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          return null;
+        }
+        sourceBytes = response.bodyBytes;
+      } else {
+        return null;
+      }
+
+      return compute(
+        _buildPreviewThumbnailBytes,
+        _PreviewThumbnailJob(
+          bytes: sourceBytes,
+          targetWidth: 960,
+        ),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _appendStrokePoint(Offset localPosition, Size size, Rect viewportRect) {
+    final current = Offset(
+      localPosition.dx.clamp(viewportRect.left, viewportRect.right),
+      localPosition.dy.clamp(viewportRect.top, viewportRect.bottom),
+    );
+    final last = _lastStrokePoint;
+    if (last != null && (current - last).distance < 4.0) {
+      return;
+    }
+    setState(() {
+      _strokePoints.add(current);
+      _lastStrokePoint = current;
+      _hoverPoint = current;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        title: const Text('区域重绘'),
+        leading: IconButton(
+          icon: const Icon(Icons.close_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 980;
+            final editor = SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+                  _buildInpaintPreviewPanel(context),
+                  const SizedBox(height: 20),
+                  _buildInpaintControlsPanel(context),
+                ],
+              ),
+            );
+
+            if (!isWide) {
+              return editor;
+            }
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 7,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: _buildInpaintPreviewPanel(context),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 5,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 12),
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 420),
+                          child: _buildInpaintControlsPanel(context),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInpaintPreviewPanel(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '涂抹需要重绘的区域',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '先在图上涂抹，再输入一句自然语言描述，提交后仅修改你选中的部分。',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 13,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 18),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final imageWidth = constraints.maxWidth;
+                final imageHeight = (imageWidth * 0.72).clamp(320.0, 600.0);
+                _previewSize = Size(imageWidth, imageHeight);
+                return FutureBuilder<_PreviewThumbnailData?>(
+                  future: _previewBytesFuture,
+                  builder: (context, snapshot) {
+                    final previewData = snapshot.data;
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: SizedBox(
+                        width: imageWidth,
+                        height: imageHeight,
+                        child: snapshot.connectionState != ConnectionState.done
+                            ? Container(
+                                color: Colors.black.withValues(alpha: 0.04),
+                                alignment: Alignment.center,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.2,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      '正在加载重绘预览…',
+                                      style: TextStyle(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                            : previewData == null
+                                ? Container(
+                                    color: Colors.black.withValues(alpha: 0.04),
+                                    alignment: Alignment.center,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 24,
+                                    ),
+                                    child: Text(
+                                      '预览加载失败，请关闭后重试。',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    )
+                                : MouseRegion(
+                                    onHover: (event) {
+                                      final viewportRect = _imageViewportRect ??
+                                          Rect.fromLTWH(
+                                            0,
+                                            0,
+                                            imageWidth,
+                                            imageHeight,
+                                          );
+                                      setState(() {
+                                        _hoverPoint = Offset(
+                                          event.localPosition.dx.clamp(
+                                            viewportRect.left,
+                                            viewportRect.right,
+                                          ),
+                                          event.localPosition.dy.clamp(
+                                            viewportRect.top,
+                                            viewportRect.bottom,
+                                          ),
+                                        );
+                                      });
+                                    },
+                                    child: GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onPanStart: (details) {
+                                        final size = Size(imageWidth, imageHeight);
+                                        final viewportRect =
+                                            _imageViewportRect ??
+                                                Rect.fromLTWH(
+                                                  0,
+                                                  0,
+                                                  imageWidth,
+                                                  imageHeight,
+                                                );
+                                        setState(() {
+                                          _isDrawing = true;
+                                          _hoverPoint = Offset(
+                                            details.localPosition.dx.clamp(
+                                              viewportRect.left,
+                                              viewportRect.right,
+                                            ),
+                                            details.localPosition.dy.clamp(
+                                              viewportRect.top,
+                                              viewportRect.bottom,
+                                            ),
+                                          );
+                                        });
+                                        _appendStrokePoint(
+                                          details.localPosition,
+                                          size,
+                                          viewportRect,
+                                        );
+                                      },
+                                      onPanUpdate: (details) {
+                                        final size = Size(imageWidth, imageHeight);
+                                        final viewportRect =
+                                            _imageViewportRect ??
+                                                Rect.fromLTWH(
+                                                  0,
+                                                  0,
+                                                  imageWidth,
+                                                  imageHeight,
+                                                );
+                                        setState(() {
+                                          _hoverPoint = Offset(
+                                            details.localPosition.dx.clamp(
+                                              viewportRect.left,
+                                              viewportRect.right,
+                                            ),
+                                            details.localPosition.dy.clamp(
+                                              viewportRect.top,
+                                              viewportRect.bottom,
+                                            ),
+                                          );
+                                        });
+                                        _appendStrokePoint(
+                                          details.localPosition,
+                                          size,
+                                          viewportRect,
+                                        );
+                                      },
+                                      onPanEnd: (_) {
+                                        setState(() {
+                                          _isDrawing = false;
+                                          _lastStrokePoint = null;
+                                        });
+                                      },
+                                      onPanCancel: () {
+                                        setState(() {
+                                          _isDrawing = false;
+                                          _lastStrokePoint = null;
+                                        });
+                                      },
+                                      child: RepaintBoundary(
+                                        child: Stack(
+                                          children: [
+                                            Positioned.fill(
+                                              child: LayoutBuilder(
+                                                builder: (context, inner) {
+                                                  final containerWidth =
+                                                      inner.maxWidth;
+                                                  final containerHeight =
+                                                      inner.maxHeight;
+                                                  final imageAspect =
+                                                      previewData.aspectRatio;
+                                                  double fittedWidth =
+                                                      containerWidth;
+                                                  double fittedHeight =
+                                                      fittedWidth / imageAspect;
+                                                  if (fittedHeight >
+                                                      containerHeight) {
+                                                    fittedHeight =
+                                                        containerHeight;
+                                                    fittedWidth =
+                                                        fittedHeight *
+                                                            imageAspect;
+                                                  }
+                                                  final left =
+                                                      (containerWidth -
+                                                              fittedWidth) /
+                                                          2;
+                                                  final top =
+                                                      (containerHeight -
+                                                              fittedHeight) /
+                                                          2;
+                                                  _imageViewportRect =
+                                                      Rect.fromLTWH(
+                                                        left,
+                                                        top,
+                                                        fittedWidth,
+                                                        fittedHeight,
+                                                      );
+                                                  return Image.memory(
+                                                    previewData.bytes,
+                                                    fit: BoxFit.contain,
+                                                    filterQuality:
+                                                        FilterQuality.low,
+                                                    gaplessPlayback: true,
+                                                  );
+                                                },
+                                              ),
+                                            ),
+                                            if (_strokePoints.isNotEmpty)
+                                              Positioned.fill(
+                                                child: RepaintBoundary(
+                                                  child: CustomPaint(
+                                                    painter:
+                                                        _BrushSelectionPainter(
+                                                      points: _strokePoints,
+                                                      brushRadius: _brushRadius,
+                                                      isActive: _isDrawing,
+                                                      imageViewportRect:
+                                                          _imageViewportRect,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            Positioned.fill(
+                                              child: IgnorePointer(
+                                                child: CustomPaint(
+                                                  painter: _BrushCursorPainter(
+                                                    center: _hoverPoint ??
+                                                        Offset(
+                                                          (_imageViewportRect
+                                                                      ?.center
+                                                                      .dx ??
+                                                                  imageWidth /
+                                                                      2),
+                                                          (_imageViewportRect
+                                                                      ?.center
+                                                                      .dy ??
+                                                                  imageHeight /
+                                                                      2),
+                                                        ),
+                                                    brushRadius: _brushRadius,
+                                                    isActive: _isDrawing,
+                                                    imageViewportRect:
+                                                        _imageViewportRect,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInpaintControlsPanel(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _promptController,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                labelText: '重绘描述',
+                hintText: '例如：把这个区域改成金色浮雕徽章，保持其余区域不变',
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              '笔刷大小 ${(2 * _brushRadius).round()} px',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Slider(
+              value: _brushRadius,
+              min: 8,
+              max: 40,
+              divisions: 8,
+              label: '${(2 * _brushRadius).round()} px',
+              onChanged: (value) {
+                setState(() {
+                  _brushRadius = value;
+                });
+              },
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '提示：你涂抹到的区域会被重新生成，其余部分尽量保持不变。',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12.5,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: _strokePoints.isEmpty
+                      ? null
+                      : () {
+                          setState(() {
+                            _strokePoints.clear();
+                          });
+                        },
+                  icon: const Icon(Icons.undo_rounded),
+                  label: const Text('清空涂抹'),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('取消'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: _strokePoints.isEmpty
+                      ? null
+                      : () {
+                          final prompt = _promptController.text.trim();
+                          if (prompt.isEmpty) {
+                            return;
+                          }
+                          final size = _previewSize;
+                          if (size == null || _strokePoints.isEmpty) {
+                            return;
+                          }
+                          final viewportRect = _imageViewportRect ??
+                              Rect.fromLTWH(0, 0, size.width, size.height);
+                          final normalizedPoints = _strokePoints
+                              .map(
+                                (point) => Offset(
+                                  ((point.dx - viewportRect.left) /
+                                          viewportRect.width)
+                                      .clamp(0.0, 1.0),
+                                  ((point.dy - viewportRect.top) /
+                                          viewportRect.height)
+                                      .clamp(0.0, 1.0),
+                                ),
+                              )
+                              .toList(growable: false);
+                          Navigator.of(context).pop(
+                            _InpaintRequest(
+                              prompt: prompt,
+                              normalizedPoints: normalizedPoints,
+                              normalizedBrushRadius:
+                                  (_brushRadius / viewportRect.width)
+                                      .clamp(0.0, 0.5),
+                            ),
+                          );
+                        },
+                  child: const Text('开始重绘'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BrushSelectionPainter extends CustomPainter {
+  final List<Offset> points;
+  final double brushRadius;
+  final bool isActive;
+  final Rect? imageViewportRect;
+
+  const _BrushSelectionPainter({
+    required this.points,
+    required this.brushRadius,
+    this.isActive = false,
+    this.imageViewportRect,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final overlayPaint = Paint()..color = Colors.black.withValues(alpha: 0.24);
+    final viewportRect = imageViewportRect ?? (Offset.zero & size);
+    canvas.drawRect(viewportRect, overlayPaint);
+
+    canvas.saveLayer(Offset.zero & size, Paint());
+    canvas.drawRect(viewportRect, overlayPaint);
+    final clearPaint = Paint()
+      ..blendMode = BlendMode.clear
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = brushRadius * 2;
+    if (points.length == 1) {
+      canvas.drawCircle(points.first, brushRadius, clearPaint);
+    } else if (points.length > 1) {
+      final path = Path()..moveTo(points.first.dx, points.first.dy);
+      for (final point in points.skip(1)) {
+        path.lineTo(point.dx, point.dy);
+      }
+      canvas.drawPath(path, clearPaint);
+    }
+    canvas.restore();
+
+    final strokePaint = Paint()
+      ..color = isActive
+          ? const Color(0xFF2563EB)
+          : const Color(0xFF1D4ED8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = brushRadius * 2
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    if (points.length == 1) {
+      canvas.drawCircle(points.first, brushRadius, strokePaint);
+    } else if (points.length > 1) {
+      final path = Path()..moveTo(points.first.dx, points.first.dy);
+      for (final point in points.skip(1)) {
+        path.lineTo(point.dx, point.dy);
+      }
+      canvas.drawPath(path, strokePaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BrushSelectionPainter oldDelegate) {
+    return oldDelegate.points != points ||
+        oldDelegate.brushRadius != brushRadius ||
+        oldDelegate.isActive != isActive ||
+        oldDelegate.imageViewportRect != imageViewportRect;
+  }
+}
+
+class _BrushCursorPainter extends CustomPainter {
+  final Offset center;
+  final double brushRadius;
+  final bool isActive;
+  final Rect? imageViewportRect;
+
+  const _BrushCursorPainter({
+    required this.center,
+    required this.brushRadius,
+    required this.isActive,
+    this.imageViewportRect,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final viewportRect = imageViewportRect ?? (Offset.zero & size);
+    if (!viewportRect.contains(center)) {
+      return;
+    }
+    final fillPaint = Paint()
+      ..color = const Color(0xFF2563EB).withValues(
+        alpha: isActive ? 0.12 : 0.08,
+      )
+      ..style = PaintingStyle.fill;
+    final strokePaint = Paint()
+      ..color = isActive ? const Color(0xFF1D4ED8) : const Color(0xFF2563EB)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6;
+    canvas.drawCircle(center, brushRadius, fillPaint);
+    canvas.drawCircle(center, brushRadius, strokePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _BrushCursorPainter oldDelegate) {
+    return oldDelegate.center != center ||
+        oldDelegate.brushRadius != brushRadius ||
+        oldDelegate.isActive != isActive ||
+        oldDelegate.imageViewportRect != imageViewportRect;
   }
 }
 
