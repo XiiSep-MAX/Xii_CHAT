@@ -1,11 +1,11 @@
 {
-  "version": "1.2.11",
-  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.11.zip",
+  "version": "1.2.12",
+  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.12.zip",
   "mirrorUrls": [
-    "https://github.com/XiiSep-MAX/Xii_CHAT/releases/download/v1.2.11/Xii_Raw_Graph_Trial_v1.2.11.zip"
+    "https://github.com/XiiSep-MAX/Xii_CHAT/releases/download/v1.2.12/Xii_Raw_Graph_Trial_v1.2.12.zip"
   ],
-  "sha256": "d1eaa887a0e4982bb9e8774e91af4ac40218806530a6c25137d965b56c17ccdd",
-  "releaseNotes": "🎨 1.2.11 图像编辑与交互稳定性增强版\n\n本次更新包含：\n- 图生图链路按 Packy 文档调整，文生图与图生图能力对齐\n- 生成图新增扩图与区域重绘入口，支持独立编辑页体验\n- 区域重绘编辑器优化为后台缩略预览、轻量画笔与可视笔刷圆环\n- 输入工作台、模板库与参考图交互继续优化",
+  "sha256": "674579f25053963afa29f9f27b7124175f1d906fcefd298d2183af6ebd9f33dc",
+  "releaseNotes": "🎨 1.2.12 对话体验与品牌升级版\n\n本次更新包含：\n- 生成图支持一键引用到对话，直接作为参考图继续生成\n- 生成中的动画改成更接近 Gemini 的内容流反馈，并按尺寸显示占位比例\n- 用户与 AI 消息的复制入口改为悬停显示，布局更稳定\n- 应用品牌 Logo 与 Web / Windows 图标已更新为专属版本",
   "isForced": false,
-  "signature": "hREgK+pwNMaiUWW8VsUo/nKH6qziNive/2vmPzmUmzw7so7BvZEVv6WQU4tEwDheiw8cXQYaiT8OCJeYwDzGAQ=="
+  "signature": "m3zsTP56b++rj8mLMefEquj1/ueh/WCx7xug3YWugCE02nJejaXFm3VxtPz+tVzWm36kUDP0S351BaSDdyXkDA=="
 }
