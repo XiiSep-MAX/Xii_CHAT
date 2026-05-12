@@ -1532,6 +1532,51 @@ class _ChatScreenState extends State<ChatScreen> {
     _appendSelectedImageAttachments(attachments);
   }
 
+  Future<ChatImageAttachment?> _buildReferenceAttachmentFromGeneratedImage(
+    GeneratedImageAsset image,
+  ) async {
+    try {
+      if (image.hasBytes) {
+        return ChatImageAttachment(
+          bytes: image.bytes!,
+          name: image.fileName,
+          mimeType: image.mimeType,
+        );
+      }
+
+      if (image.hasUrl) {
+        final response = await http.get(Uri.parse(image.imageUrl!));
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          return null;
+        }
+        return ChatImageAttachment(
+          bytes: response.bodyBytes,
+          name: image.fileName,
+          mimeType: image.mimeType,
+        );
+      }
+    } catch (_) {
+      return null;
+    }
+
+    return null;
+  }
+
+  Future<void> _quoteGeneratedImageAsReference(
+    GeneratedImageAsset image,
+  ) async {
+    final attachment = await _buildReferenceAttachmentFromGeneratedImage(image);
+    if (attachment == null) {
+      _showSnackBar('暂时无法引用这张图片，请稍后重试。');
+      return;
+    }
+
+    _appendSelectedImageAttachments([attachment]);
+
+    if (!mounted) return;
+    _showSnackBar('已引用到对话，后续发送会将它作为参考图。');
+  }
+
   void _appendSelectedImageAttachments(
     List<ChatImageAttachment> attachments,
   ) {
@@ -2386,44 +2431,6 @@ class _ChatScreenState extends State<ChatScreen> {
               onActivate: _showActivationDialog,
             ),
           ),
-        if (_isSending)
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEEF4FF),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: Theme.of(
-                  context,
-                ).colorScheme.secondary.withValues(alpha: 0.22),
-                width: 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 1.8,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'AI 正在生成图片...',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.secondary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
         Expanded(
           child: _messages.isEmpty
               ? LayoutBuilder(
@@ -2457,8 +2464,18 @@ class _ChatScreenState extends State<ChatScreen> {
               : ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                  itemCount: _messages.length,
+                  itemCount: _messages.length + (_isSending ? 1 : 0),
                   itemBuilder: (context, index) {
+                    if (_isSending && index == _messages.length) {
+                      return Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: contentMaxWidth),
+                          child: _GeminiGenerationPlaceholder(
+                            sizeValue: _generationOptions.size,
+                          ),
+                        ),
+                      );
+                    }
                     final message = _messages[index];
                     return Center(
                       child: ConstrainedBox(
@@ -2469,6 +2486,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           isNew: index == _messages.length - 1 && !_isSending,
                           onOutpaintImage: _handleOutpaintFromGeneratedImage,
                           onInpaintImage: _handleInpaintFromGeneratedImage,
+                          onQuoteImage: _quoteGeneratedImageAsReference,
                         ),
                       ),
                     );
@@ -3021,10 +3039,12 @@ class _SessionSidebar extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.smart_toy,
-                        color: Colors.white,
-                        size: 20,
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Image.asset(
+                          'assets/branding/app_logo.png',
+                          fit: BoxFit.contain,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -3736,6 +3756,7 @@ class AnimatedMessageBubble extends StatefulWidget {
   final bool isNew;
   final ValueChanged<GeneratedImageAsset> onOutpaintImage;
   final ValueChanged<GeneratedImageAsset> onInpaintImage;
+  final ValueChanged<GeneratedImageAsset> onQuoteImage;
 
   const AnimatedMessageBubble({
     super.key,
@@ -3743,6 +3764,7 @@ class AnimatedMessageBubble extends StatefulWidget {
     this.isNew = false,
     required this.onOutpaintImage,
     required this.onInpaintImage,
+    required this.onQuoteImage,
   });
 
   @override
@@ -3806,6 +3828,7 @@ class _AnimatedMessageBubbleState extends State<AnimatedMessageBubble>
           message: widget.message,
           onOutpaintImage: widget.onOutpaintImage,
           onInpaintImage: widget.onInpaintImage,
+          onQuoteImage: widget.onQuoteImage,
         ),
       ),
     );
@@ -3816,12 +3839,14 @@ class ChatBubble extends StatelessWidget {
   final ChatMessage message;
   final ValueChanged<GeneratedImageAsset> onOutpaintImage;
   final ValueChanged<GeneratedImageAsset> onInpaintImage;
+  final ValueChanged<GeneratedImageAsset> onQuoteImage;
 
   const ChatBubble({
     super.key,
     required this.message,
     required this.onOutpaintImage,
     required this.onInpaintImage,
+    required this.onQuoteImage,
   });
 
   void _copyMessageText(BuildContext context, String text) {
@@ -3848,6 +3873,12 @@ class ChatBubble extends StatelessWidget {
       pageBuilder: (context, animation, secondaryAnimation) {
         return _ImagePreviewDialog(
           image: image,
+          onQuote: editableImage == null
+              ? null
+              : () {
+                  Navigator.of(context).pop();
+                  onQuoteImage(editableImage);
+                },
           onOutpaint: editableImage == null
               ? null
               : () {
@@ -3986,27 +4017,25 @@ class ChatBubble extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Align(
         alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: isUser
-                ? (screenWidth < 720
-                    ? screenWidth * 0.8
-                    : screenWidth < 980
-                        ? 460
-                        : 520)
-                : (screenWidth < 980 ? screenWidth * 0.92 : 860),
-          ),
-          child: isUser
-              ? Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Flexible(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          if (message.text.isNotEmpty)
-                            _CopyableMessageContent(
+        child: isUser
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (message.text.isNotEmpty)
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: screenWidth < 720
+                                  ? screenWidth * 0.8
+                                  : screenWidth < 980
+                                      ? 460
+                                      : 520,
+                            ),
+                            child: _CopyableMessageContent(
                               text: message.text,
                               bubbleColor: bubbleColor,
                               textColor: textColor,
@@ -4014,6 +4043,94 @@ class ChatBubble extends StatelessWidget {
                               onCopy: () =>
                                   _copyMessageText(context, message.text),
                             ),
+                          ),
+                        if (message.hasImages) const SizedBox(height: 12),
+                        for (final localImage in message.localImages) ...[
+                          _ChatImageFrame(
+                            onTap: () => _showImagePreview(
+                              context,
+                              Image.memory(
+                                localImage.bytes,
+                                fit: BoxFit.contain,
+                                filterQuality: FilterQuality.high,
+                              ),
+                            ),
+                            child: Image.memory(
+                              localImage.bytes,
+                              fit: BoxFit.cover,
+                              filterQuality: FilterQuality.high,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        for (final image in message.generatedImages) ...[
+                          _ChatImageFrame(
+                            onTap: () => _showImagePreview(
+                              context,
+                              _buildGeneratedImageWidget(
+                                image,
+                                fit: BoxFit.contain,
+                              ),
+                              editableImage: image,
+                            ),
+                            onQuote: () => onQuoteImage(image),
+                            child: _buildGeneratedImageWidget(
+                              image,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          _ImageDownloadAction(
+                            image: image,
+                            alignment: Alignment.centerRight,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  avatar,
+                ],
+              )
+            : Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(0, 2, 0, 2),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    avatar,
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'AI 助手',
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (message.text.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth:
+                                    screenWidth < 980 ? screenWidth * 0.92 : 860,
+                              ),
+                              child: _CopyableMessageContent(
+                                text: message.text,
+                                bubbleColor: bubbleColor,
+                                textColor: textColor,
+                                isUser: false,
+                                onCopy: () =>
+                                    _copyMessageText(context, message.text),
+                              ),
+                            ),
+                          ],
                           if (message.hasImages) const SizedBox(height: 12),
                           for (final localImage in message.localImages) ...[
                             _ChatImageFrame(
@@ -4043,6 +4160,7 @@ class ChatBubble extends StatelessWidget {
                                 ),
                                 editableImage: image,
                               ),
+                              onQuote: () => onQuoteImage(image),
                               child: _buildGeneratedImageWidget(
                                 image,
                                 fit: BoxFit.cover,
@@ -4051,102 +4169,21 @@ class ChatBubble extends StatelessWidget {
                             const SizedBox(height: 8),
                             _ImageDownloadAction(
                               image: image,
-                              alignment: Alignment.centerRight,
+                              alignment: Alignment.centerLeft,
                             ),
                           ],
                         ],
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    avatar,
                   ],
-                )
-              : Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(0, 2, 0, 2),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      avatar,
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'AI 助手',
-                              style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            if (message.text.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              _CopyableMessageContent(
-                                text: message.text,
-                                bubbleColor: bubbleColor,
-                                textColor: textColor,
-                                isUser: false,
-                                onCopy: () =>
-                                    _copyMessageText(context, message.text),
-                              ),
-                            ],
-                            if (message.hasImages) const SizedBox(height: 12),
-                            for (final localImage in message.localImages) ...[
-                              _ChatImageFrame(
-                                onTap: () => _showImagePreview(
-                                  context,
-                                  Image.memory(
-                                    localImage.bytes,
-                                    fit: BoxFit.contain,
-                                    filterQuality: FilterQuality.high,
-                                  ),
-                                ),
-                                child: Image.memory(
-                                  localImage.bytes,
-                                  fit: BoxFit.cover,
-                                  filterQuality: FilterQuality.high,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                            ],
-                            for (final image in message.generatedImages) ...[
-                              _ChatImageFrame(
-                                onTap: () => _showImagePreview(
-                                  context,
-                                  _buildGeneratedImageWidget(
-                                    image,
-                                    fit: BoxFit.contain,
-                                  ),
-                                  editableImage: image,
-                                ),
-                                child: _buildGeneratedImageWidget(
-                                  image,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              _ImageDownloadAction(
-                                image: image,
-                                alignment: Alignment.centerLeft,
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
-        ),
+              ),
       ),
     );
   }
 }
 
-class _CopyableMessageContent extends StatelessWidget {
+class _CopyableMessageContent extends StatefulWidget {
   final String text;
   final Color bubbleColor;
   final Color textColor;
@@ -4162,95 +4199,102 @@ class _CopyableMessageContent extends StatelessWidget {
   });
 
   @override
+  State<_CopyableMessageContent> createState() => _CopyableMessageContentState();
+}
+
+class _CopyableMessageContentState extends State<_CopyableMessageContent> {
+  bool _showCopyAction = false;
+
+  @override
   Widget build(BuildContext context) {
-    if (isUser) {
-      return Container(
-        decoration: BoxDecoration(
-          color: bubbleColor,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(22),
-            topRight: Radius.circular(22),
-            bottomLeft: Radius.circular(22),
-            bottomRight: Radius.circular(8),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF2563EB).withValues(alpha: 0.12),
-              blurRadius: 18,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 18,
-          vertical: 13,
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    final actionAlignment =
+        widget.isUser ? Alignment.centerRight : Alignment.centerLeft;
+    final textAlign = widget.isUser ? TextAlign.right : TextAlign.left;
+    final textColor = widget.isUser
+        ? Theme.of(context).colorScheme.onSurface
+        : widget.textColor;
+    final textHeight = widget.isUser ? 1.52 : 1.78;
+
+    return MouseRegion(
+      onEnter: (_) {
+        if (!_showCopyAction) {
+          setState(() {
+            _showCopyAction = true;
+          });
+        }
+      },
+      onExit: (_) {
+        if (_showCopyAction) {
+          setState(() {
+            _showCopyAction = false;
+          });
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Column(
+          crossAxisAlignment:
+              widget.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 24),
               child: SelectableText(
-                text,
+                widget.text,
+                textAlign: textAlign,
                 style: TextStyle(
                   fontSize: 15.5,
                   color: textColor,
-                  height: 1.52,
+                  height: textHeight,
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            IconButton(
-              onPressed: onCopy,
-              tooltip: '复制文字',
-              constraints: const BoxConstraints(
-                minWidth: 32,
-                minHeight: 32,
-              ),
-              padding: EdgeInsets.zero,
-              splashRadius: 18,
-              visualDensity: VisualDensity.compact,
-              icon: Icon(
-                Icons.content_copy_rounded,
-                size: 18,
-                color: textColor.withValues(alpha: 0.78),
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 28,
+              child: Align(
+                alignment: actionAlignment,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 140),
+                  opacity: _showCopyAction ? 1 : 0,
+                  child: IgnorePointer(
+                    ignoring: !_showCopyAction,
+                    child: TextButton.icon(
+                      onPressed: widget.onCopy,
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      icon: Icon(
+                        Icons.content_copy_rounded,
+                        size: 15,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant,
+                      ),
+                      label: Text(
+                        '复制',
+                        style: TextStyle(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
         ),
-      );
-    }
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: SelectableText(
-            text,
-            style: TextStyle(
-              fontSize: 15.5,
-              color: textColor,
-              height: 1.78,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        IconButton(
-          onPressed: onCopy,
-          tooltip: '复制文字',
-          constraints: const BoxConstraints(
-            minWidth: 32,
-            minHeight: 32,
-          ),
-          padding: EdgeInsets.zero,
-          splashRadius: 18,
-          visualDensity: VisualDensity.compact,
-          icon: Icon(
-            Icons.content_copy_rounded,
-            size: 18,
-            color: textColor.withValues(alpha: 0.6),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -4318,7 +4362,6 @@ class _ImageDownloadActionState extends State<_ImageDownloadAction> {
     return Align(
       alignment: widget.alignment,
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 220),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.9),
           borderRadius: BorderRadius.circular(22),
@@ -4338,7 +4381,7 @@ class _ImageDownloadActionState extends State<_ImageDownloadAction> {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TextButton.icon(
                 onPressed: _isDownloading ? null : _handleDownload,
@@ -4371,6 +4414,9 @@ class _ImageDownloadActionState extends State<_ImageDownloadAction> {
                     horizontal: 16,
                     vertical: 8,
                   ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                   ),
@@ -4378,27 +4424,33 @@ class _ImageDownloadActionState extends State<_ImageDownloadAction> {
               ),
               if (_isDownloading && progress != null) ...[
                 const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: progress.progress,
-                    minHeight: 6,
-                    backgroundColor: Theme.of(context)
-                        .colorScheme
-                        .surfaceContainerHighest
-                        .withOpacity(0.5),
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Theme.of(context).colorScheme.primary,
+                SizedBox(
+                  width: 180,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: progress.progress,
+                      minHeight: 6,
+                      backgroundColor: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest
+                          .withOpacity(0.5),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Theme.of(context).colorScheme.primary,
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  '${progress.message} · ${progress.progressLabel}',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 220),
+                  child: Text(
+                    '${progress.message} · ${progress.progressLabel}',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
@@ -4690,10 +4742,12 @@ class _ComposerDropdownPill extends StatelessWidget {
 class _ChatImageFrame extends StatelessWidget {
   final Widget child;
   final VoidCallback? onTap;
+  final VoidCallback? onQuote;
 
   const _ChatImageFrame({
     required this.child,
     this.onTap,
+    this.onQuote,
   });
 
   @override
@@ -4713,21 +4767,44 @@ class _ChatImageFrame extends StatelessWidget {
             Positioned(
               right: 12,
               bottom: 12,
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.58),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: const Padding(
-                    padding: EdgeInsets.all(8),
-                    child: Icon(
-                      Icons.open_in_full_rounded,
-                      color: Colors.white,
-                      size: 18,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (onQuote != null)
+                    Material(
+                      color: Colors.black.withValues(alpha: 0.58),
+                      borderRadius: BorderRadius.circular(999),
+                      child: InkWell(
+                        onTap: onQuote,
+                        borderRadius: BorderRadius.circular(999),
+                        child: const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Icon(
+                            Icons.reply_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (onQuote != null) const SizedBox(width: 8),
+                  IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.58),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Icon(
+                          Icons.open_in_full_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
         ],
@@ -4768,11 +4845,13 @@ class _ImagePreviewDialog extends StatelessWidget {
   final Widget image;
   final VoidCallback? onOutpaint;
   final VoidCallback? onInpaint;
+  final VoidCallback? onQuote;
 
   const _ImagePreviewDialog({
     required this.image,
     this.onOutpaint,
     this.onInpaint,
+    this.onQuote,
   });
 
   @override
@@ -4815,6 +4894,35 @@ class _ImagePreviewDialog extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (onQuote != null)
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.45),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: TextButton.icon(
+                        onPressed: onQuote,
+                        icon: const Icon(
+                          Icons.reply_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                        label: const Text(
+                          '引用',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (onQuote != null) const SizedBox(width: 10),
                   if (onInpaint != null)
                     DecoratedBox(
                       decoration: BoxDecoration(
@@ -5681,6 +5789,296 @@ class _InpaintEditorPageState extends State<_InpaintEditorPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _GeminiGenerationPlaceholder extends StatefulWidget {
+  final String sizeValue;
+
+  const _GeminiGenerationPlaceholder({
+    required this.sizeValue,
+  });
+
+  @override
+  State<_GeminiGenerationPlaceholder> createState() =>
+      _GeminiGenerationPlaceholderState();
+}
+
+class _GeminiGenerationPlaceholderState
+    extends State<_GeminiGenerationPlaceholder>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final imageAspectRatio = _resolvePlaceholderAspectRatio(widget.sizeValue);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE2E8F0),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.auto_awesome_rounded,
+              color: Color(0xFF475569),
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(0, 2, 0, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'AI 助手',
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _buildPulseDot(const Color(0xFF5B8CFF), 0),
+                      const SizedBox(width: 6),
+                      _buildPulseDot(const Color(0xFF8B5CF6), 0.16),
+                      const SizedBox(width: 6),
+                      _buildPulseDot(const Color(0xFF06B6D4), 0.32),
+                      const SizedBox(width: 12),
+                      Text(
+                        '正在构图并生成图像…',
+                        style: TextStyle(
+                          color: scheme.onSurface,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  _buildShimmerTextStub(
+                    context,
+                    '图像细节渲染中',
+                    delay: 0.0,
+                  ),
+                  const SizedBox(height: 10),
+                  _buildShimmerTextStub(
+                    context,
+                    '保持参考图主体特征',
+                    delay: 0.18,
+                  ),
+                  const SizedBox(height: 18),
+                  _buildImagePlaceholder(imageAspectRatio),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPulseDot(Color color, double phase) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final t = (_controller.value + phase) % 1.0;
+        final scale = 0.85 + (0.35 * (1 - (t - 0.5).abs() * 2));
+        final alpha = (0.45 + (0.55 * (1 - (t - 0.5).abs() * 2))).clamp(0.0, 1.0);
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: alpha),
+              shape: BoxShape.circle,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildShimmerTextStub(
+    BuildContext context,
+    String text, {
+    required double delay,
+  }) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final scheme = Theme.of(context).colorScheme;
+        final base = scheme.surfaceContainerHighest.withValues(alpha: 0.65);
+        final glow = const Color(0xFFDBEAFE).withValues(alpha: 0.92);
+        final shift = ((_controller.value + delay) % 1.0);
+        final textStyle = TextStyle(
+          fontSize: 13.5,
+          fontWeight: FontWeight.w600,
+        );
+        final painter = TextPainter(
+          text: TextSpan(text: text, style: textStyle),
+          textDirection: Directionality.of(context),
+          maxLines: 1,
+        )..layout();
+        final stubWidth = painter.width + 18;
+        return FractionallySizedBox(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            width: stubWidth,
+            height: 13,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              gradient: LinearGradient(
+                begin: Alignment(-1.0 + shift * 2.2, 0),
+                end: Alignment(-0.2 + shift * 2.2, 0),
+                colors: [
+                  base,
+                  glow,
+                  base,
+                ],
+                stops: const [0.0, 0.5, 1.0],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  double _resolvePlaceholderAspectRatio(String value) {
+    switch (value) {
+      case '1536x1024':
+        return 3 / 2;
+      case '1024x1536':
+        return 2 / 3;
+      case '2048x1152':
+      case '3840x2160':
+        return 16 / 9;
+      case '2160x3840':
+        return 9 / 16;
+      case '1024x1024':
+      case '2048x2048':
+      case 'auto':
+      default:
+        return 1.0;
+    }
+  }
+
+  Widget _buildImagePlaceholder(double aspectRatio) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final scheme = Theme.of(context).colorScheme;
+        final shift = _controller.value;
+        final base = scheme.surfaceContainerHighest.withValues(alpha: 0.7);
+        final glowA = const Color(0xFFDBEAFE).withValues(alpha: 0.92);
+        final glowB = const Color(0xFFE9D5FF).withValues(alpha: 0.86);
+
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: SizedBox(
+            width: 232,
+            child: AspectRatio(
+              aspectRatio: aspectRatio,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: scheme.outline.withValues(alpha: 0.16),
+                  ),
+                  gradient: LinearGradient(
+                    begin: Alignment(-1.2 + shift * 2.4, -0.8),
+                    end: Alignment(-0.1 + shift * 2.4, 0.8),
+                    colors: [
+                      base,
+                      glowA,
+                      glowB,
+                      base,
+                    ],
+                    stops: const [0.0, 0.35, 0.62, 1.0],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF2563EB).withValues(alpha: 0.08),
+                      blurRadius: 18,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.white.withValues(alpha: 0.22),
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.06),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.image_search_rounded,
+                        size: 34,
+                        color: scheme.onSurfaceVariant.withValues(alpha: 0.45),
+                      ),
+                    ),
+                    Positioned(
+                      left: 14,
+                      right: 14,
+                      bottom: 14,
+                      child: Container(
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.32),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
