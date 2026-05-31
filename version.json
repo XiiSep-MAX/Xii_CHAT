@@ -1,11 +1,11 @@
 {
-  "version": "1.2.13",
-  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.13.zip",
+  "version": "1.2.14",
+  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.14.zip",
   "mirrorUrls": [
-    "https://github.com/XiiSep-MAX/Xii_CHAT/releases/download/v1.2.13/Xii_Raw_Graph_Trial_v1.2.13.zip"
+    "https://github.com/XiiSep-MAX/Xii_CHAT/releases/download/v1.2.14/Xii_Raw_Graph_Trial_v1.2.14.zip"
   ],
-  "sha256": "04103d79d4df14eac666b36f0fa23fe8f0381d91c4e402fc714003eaf5ebf883",
-  "releaseNotes": "🚀 1.2.13 生成恢复与 HUD 界面升级\n\n本次更新包含：\n- 未完成的生图任务现在会写入本地记录，关闭 App 后重新打开可继续轮询并自动回填结果\n- 生成进行中会锁定重复生成、新建会话和切换会话，避免任务状态丢失或上下文错乱\n- 生图中的占位反馈已升级为更直观的动态加载卡片，并按所选尺寸显示真实画幅比例\n- 启动页重做为 HUD / 全息投影风格，启动动画会跟随真实初始化流程，但不会短于设定动画时长\n- 主界面视觉同步升级为统一的深蓝科幻风格，输入区改为悬浮式底部面板，并补充呼吸光晕动效\n- Windows 窗口标题与边框配色、Web 页面标题与下载页版本信息已同步到 Xii_Raw Graph v1.2.13",
+  "sha256": "7d47f6056aa971f9e13db65bb7f56e3000bccc134653216dc38497c21fc93372",
+  "releaseNotes": "🛠️ 1.2.14 生成链路修复版\n\n本次更新包含：\n- 修复相同提示词再次生成时可能直接返回旧任务结果的问题，现在每次点击生成都会创建新的生图任务\n- 修复存在可恢复任务时仍然可以继续点击生成的问题，生成中的会话现在会严格锁定重复生成\n- 保留关闭 App 后重新打开继续恢复未完成生图任务的能力",
   "isForced": false,
-  "signature": "V+FbGevcngZSQyhGoOhGhE8lO5jjkwSSLPCO4gWvbPfWDoUHu9srxypd0IdTMiENsfmAH8sZI/K63p+3PFMgAg=="
+  "signature": "fEdaAUE5mtOqYx3sVUufxCav6pXTyYyvFOhrp9l05weRFJHzBFDjGG9tPfJHyHPRczAD7OXS8pYQnMOwHTcCAw=="
 }
