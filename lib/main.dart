@@ -1672,7 +1672,7 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen>
     with SingleTickerProviderStateMixin {
-  static const String _appVersion = '1.2.12';
+  static const String _appVersion = '1.2.13';
   static const String _privacyAcknowledgedKey = 'privacy_acknowledged_v1';
   static const String _retainReferenceImagesKey = 'retain_reference_images_v1';
   static const String _contactWechatId = '123456';
