@@ -1008,6 +1008,9 @@ async function handleGenerate(
   }
   validateLicenseAvailability(license);
 
+  // Always create a fresh generation task for each user request.
+  // Recovery after app restart relies on the persisted taskId locally,
+  // not on reusing an old task for the same prompt/options payload.
   const idempotencyKey = await sha256Hex(
     JSON.stringify({
       licenseId: license.id,
@@ -1016,13 +1019,10 @@ async function handleGenerate(
       size: requestSize,
       quality: requestQuality,
       referenceImages,
+      requestNonce: crypto.randomUUID(),
+      requestedAt: Date.now(),
     }),
   );
-
-  const existingTask = await loadGenerationTaskByIdempotencyKey(env, idempotencyKey);
-  if (existingTask) {
-    return json(buildGenerationTaskResponse(existingTask));
-  }
 
   const task = await createGenerationTask(env, {
     taskType: referenceImages.length === 0 ? "generate" : "edit_from_reference",
