@@ -88,3 +88,32 @@ CREATE TABLE IF NOT EXISTS safety_events (
 
 CREATE INDEX IF NOT EXISTS idx_safety_events_created
 ON safety_events(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS generation_tasks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  task_id TEXT NOT NULL UNIQUE,
+  idempotency_key TEXT NOT NULL UNIQUE,
+  license_code_id INTEGER NOT NULL,
+  install_id_hash TEXT NOT NULL,
+  task_type TEXT NOT NULL DEFAULT 'generate',
+  status TEXT NOT NULL DEFAULT 'pending',
+  prompt TEXT NOT NULL,
+  request_size TEXT NOT NULL,
+  request_quality TEXT NOT NULL,
+  reference_images_json TEXT,
+  source_image_json TEXT,
+  mask_image_json TEXT,
+  result_json TEXT,
+  error_message TEXT,
+  upstream_status INTEGER,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  completed_at TEXT,
+  FOREIGN KEY (license_code_id) REFERENCES license_codes(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_generation_tasks_lookup
+ON generation_tasks(license_code_id, install_id_hash, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_generation_tasks_status
+ON generation_tasks(status, updated_at DESC);

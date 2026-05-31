@@ -2,6 +2,7 @@ import { renderAdminPage } from "./admin-page";
 
 export interface Env {
   DB: D1Database;
+  GENERATION_QUEUE: Queue;
   OPENAI_API_KEY: string;
   LICENSE_SIGNING_SECRET: string;
   ADMIN_ACCESS_TOKEN: string;
@@ -95,8 +96,34 @@ type OrderRow = {
   updated_at: string;
 };
 
+type GenerationTaskRow = {
+  id: number;
+  task_id: string;
+  idempotency_key: string;
+  license_code_id: number;
+  install_id_hash: string;
+  task_type: string;
+  status: string;
+  prompt: string;
+  request_size: string;
+  request_quality: string;
+  reference_images_json: string | null;
+  source_image_json: string | null;
+  mask_image_json: string | null;
+  result_json: string | null;
+  error_message: string | null;
+  upstream_status: number | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+};
+
+type GenerationQueueMessage = {
+  taskId: string;
+};
+
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       const url = new URL(request.url);
 
@@ -133,7 +160,11 @@ export default {
       }
 
       if (request.method === "POST" && url.pathname === "/v1/chat/generate") {
-        return await handleGenerate(request, env);
+        return await handleGenerate(request, env, ctx);
+      }
+
+      if (request.method === "GET" && url.pathname.startsWith("/v1/chat/tasks/")) {
+        return await handleGetGenerationTask(request, env, url);
       }
 
       if (request.method === "POST" && url.pathname === "/v1/chat/edit-image") {
@@ -153,6 +184,29 @@ export default {
         },
         500,
       );
+    }
+  },
+  async queue(batch: MessageBatch<GenerationQueueMessage>, env: Env): Promise<void> {
+    for (const message of batch.messages) {
+      try {
+        const taskId = message.body?.taskId?.trim();
+        if (!taskId) {
+          message.ack();
+          continue;
+        }
+
+        const task = await loadGenerationTaskByTaskId(env, taskId);
+        if (!task) {
+          message.ack();
+          continue;
+        }
+
+        await runGenerationTask(env, task);
+        message.ack();
+      } catch (error) {
+        console.error("generation queue task failed", error);
+        message.retry();
+      }
     }
   },
 };
@@ -874,7 +928,11 @@ async function handleValidate(request: Request, env: Env): Promise<Response> {
   });
 }
 
-async function handleGenerate(request: Request, env: Env): Promise<Response> {
+async function handleGenerate(
+  request: Request,
+  env: Env,
+  _ctx: ExecutionContext,
+): Promise<Response> {
   const body = (await request.json()) as {
     token?: string | null;
     installId?: string;
@@ -950,62 +1008,38 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
   }
   validateLicenseAvailability(license);
 
-  const upstreamBody = {
-    model: env.UPSTREAM_MODEL || "gpt-image-2",
-    prompt: prompt,
-    n: 1,
-    size: requestSize,
-    quality: requestQuality,
-  };
+  const idempotencyKey = await sha256Hex(
+    JSON.stringify({
+      licenseId: license.id,
+      installIdHash,
+      prompt,
+      size: requestSize,
+      quality: requestQuality,
+      referenceImages,
+    }),
+  );
 
-  const upstreamResponse =
-    referenceImages.length === 0
-      ? await fetch(resolveImageGenerationsApiUrl(env.UPSTREAM_BASE_URL), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${env.OPENAI_API_KEY}`,
-          },
-          body: JSON.stringify({
-            ...upstreamBody,
-            output_format: "png",
-            response_format: "url",
-          }),
-        })
-      : await sendImageEditRequest(env, {
-          prompt,
-          size: requestSize,
-          quality: requestQuality,
-          referenceImages,
-        });
-
-  const upstreamText = await upstreamResponse.text();
-  const payloadJson = safeParseJson(upstreamText);
-  if (!upstreamResponse.ok) {
-    const upstreamError = describeUpstreamError(
-      upstreamResponse.status,
-      payloadJson,
-      upstreamText,
-    );
-    return json(
-      {
-        error: upstreamError.message,
-        upstreamStatus: upstreamResponse.status,
-        upstreamDetail: upstreamError.detail,
-      },
-      upstreamResponse.status,
-    );
+  const existingTask = await loadGenerationTaskByIdempotencyKey(env, idempotencyKey);
+  if (existingTask) {
+    return json(buildGenerationTaskResponse(existingTask));
   }
 
-  await appendEvent(env, license.id, "generate", {
-    size: requestSize,
-    quality: requestQuality,
-    referenceImageCount: referenceImages.length,
+  const task = await createGenerationTask(env, {
+    taskType: referenceImages.length === 0 ? "generate" : "edit_from_reference",
+    idempotencyKey,
+    licenseCodeId: license.id,
+    installIdHash,
+    prompt,
+    requestSize,
+    requestQuality,
+    referenceImagesJson:
+      referenceImages.length > 0 ? JSON.stringify(referenceImages) : null,
   });
 
-  return json({
-    content: payloadJson?.choices?.[0]?.message?.content ?? payloadJson?.data ?? payloadJson,
+  await env.GENERATION_QUEUE.send({
+    taskId: task.task_id,
   });
+  return json(buildGenerationTaskResponse(task), 202);
 }
 
 function evaluateSafety(input: {
@@ -1163,6 +1197,35 @@ async function handleEditImage(request: Request, env: Env): Promise<Response> {
   });
 }
 
+async function handleGetGenerationTask(
+  request: Request,
+  env: Env,
+  url: URL,
+): Promise<Response> {
+  const taskId = url.pathname.split("/").pop()?.trim() ?? "";
+  const token = url.searchParams.get("token")?.trim() ?? "";
+  const installId = url.searchParams.get("installId")?.trim() ?? "";
+  if (!taskId || !token || !installId) {
+    return json({ error: "缺少任务查询参数。" }, 400);
+  }
+
+  const installIdHash = await sha256Hex(installId);
+  const payload = await verifyLicenseToken(env, token);
+  if (payload.installIdHash !== installIdHash) {
+    return json({ error: "当前授权与设备不匹配。" }, 403);
+  }
+
+  const task = await loadGenerationTaskByTaskId(env, taskId);
+  if (!task) {
+    return json({ error: "任务不存在。" }, 404);
+  }
+  if (task.license_code_id !== payload.licenseId || task.install_id_hash !== installIdHash) {
+    return json({ error: "无权访问该任务。" }, 403);
+  }
+
+  return json(buildGenerationTaskResponse(task));
+}
+
 function resolveImageEditsApiUrl(baseUrl: string) {
   const trimmed = baseUrl.replace(/\/+$/, "");
   if (trimmed.endsWith("/chat/completions")) {
@@ -1284,6 +1347,191 @@ async function loadLicenseById(env: Env, id: number) {
   )
     .bind(id)
     .first<LicenseCodeRow>();
+}
+
+async function loadGenerationTaskByIdempotencyKey(
+  env: Env,
+  idempotencyKey: string,
+): Promise<GenerationTaskRow | null> {
+  const row = await env.DB.prepare(
+    `SELECT * FROM generation_tasks WHERE idempotency_key = ? LIMIT 1`,
+  )
+    .bind(idempotencyKey)
+    .first<GenerationTaskRow>();
+  return row ?? null;
+}
+
+async function loadGenerationTaskByTaskId(
+  env: Env,
+  taskId: string,
+): Promise<GenerationTaskRow | null> {
+  const row = await env.DB.prepare(
+    `SELECT * FROM generation_tasks WHERE task_id = ? LIMIT 1`,
+  )
+    .bind(taskId)
+    .first<GenerationTaskRow>();
+  return row ?? null;
+}
+
+async function createGenerationTask(
+  env: Env,
+  input: {
+    taskType: string;
+    idempotencyKey: string;
+    licenseCodeId: number;
+    installIdHash: string;
+    prompt: string;
+    requestSize: string;
+    requestQuality: string;
+    referenceImagesJson: string | null;
+  },
+): Promise<GenerationTaskRow> {
+  const now = new Date().toISOString();
+  const taskId = generateTaskId();
+  await env.DB.prepare(
+    `INSERT INTO generation_tasks (
+      task_id,
+      idempotency_key,
+      license_code_id,
+      install_id_hash,
+      task_type,
+      status,
+      prompt,
+      request_size,
+      request_quality,
+      reference_images_json,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(
+      taskId,
+      input.idempotencyKey,
+      input.licenseCodeId,
+      input.installIdHash,
+      input.taskType,
+      input.prompt,
+      input.requestSize,
+      input.requestQuality,
+      input.referenceImagesJson,
+      now,
+      now,
+    )
+    .run();
+
+  const task = await loadGenerationTaskByTaskId(env, taskId);
+  if (!task) {
+    throw new Error("Failed to create generation task.");
+  }
+  return task;
+}
+
+async function runGenerationTask(env: Env, task: GenerationTaskRow): Promise<void> {
+  await env.DB.prepare(
+    `UPDATE generation_tasks SET status = 'running', updated_at = ? WHERE id = ?`,
+  )
+    .bind(new Date().toISOString(), task.id)
+    .run();
+
+  const referenceImages = safeParseJson(task.reference_images_json || "[]");
+  const upstreamBody = {
+    model: env.UPSTREAM_MODEL || "gpt-image-2",
+    prompt: task.prompt,
+    n: 1,
+    size: task.request_size,
+    quality: task.request_quality,
+  };
+
+  const upstreamResponse =
+    Array.isArray(referenceImages) && referenceImages.length > 0
+      ? await sendImageEditRequest(env, {
+          prompt: task.prompt,
+          size: task.request_size,
+          quality: task.request_quality,
+          referenceImages,
+        })
+      : await fetch(resolveImageGenerationsApiUrl(env.UPSTREAM_BASE_URL), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            ...upstreamBody,
+            output_format: "png",
+            response_format: "url",
+          }),
+        });
+
+  const upstreamText = await upstreamResponse.text();
+  const payloadJson = safeParseJson(upstreamText);
+  const now = new Date().toISOString();
+
+  if (!upstreamResponse.ok) {
+    const upstreamError = describeUpstreamError(
+      upstreamResponse.status,
+      payloadJson,
+      upstreamText,
+    );
+    await env.DB.prepare(
+      `UPDATE generation_tasks
+       SET status = 'failed',
+           error_message = ?,
+           upstream_status = ?,
+           updated_at = ?,
+           completed_at = ?
+       WHERE id = ?`,
+    )
+      .bind(
+        upstreamError.message,
+        upstreamResponse.status,
+        now,
+        now,
+        task.id,
+      )
+      .run();
+    return;
+  }
+
+  await env.DB.prepare(
+    `UPDATE generation_tasks
+     SET status = 'completed',
+         result_json = ?,
+         upstream_status = ?,
+         updated_at = ?,
+         completed_at = ?
+     WHERE id = ?`,
+  )
+    .bind(
+      JSON.stringify(
+        payloadJson?.choices?.[0]?.message?.content ?? payloadJson?.data ?? payloadJson,
+      ),
+      upstreamResponse.status,
+      now,
+      now,
+      task.id,
+    )
+    .run();
+
+  await appendEvent(env, task.license_code_id, "generate", {
+    taskId: task.task_id,
+    size: task.request_size,
+    quality: task.request_quality,
+    referenceImageCount:
+      Array.isArray(referenceImages) ? referenceImages.length : 0,
+  });
+}
+
+function buildGenerationTaskResponse(task: GenerationTaskRow) {
+  return {
+    taskId: task.task_id,
+    status: task.status,
+    createdAt: task.created_at,
+    updatedAt: task.updated_at,
+    completedAt: task.completed_at,
+    error: task.error_message,
+    content: task.result_json ? safeParseJson(task.result_json) : null,
+  };
 }
 
 async function loadActiveBindings(env: Env, licenseCodeId: number) {
@@ -1786,6 +2034,10 @@ function buildOrderNo() {
 
 function buildOrderAccessToken() {
   return `${randomSegment(8)}${randomSegment(8)}${randomSegment(8)}`;
+}
+
+function generateTaskId() {
+  return `img_${randomSegment(6)}${randomSegment(6)}${randomSegment(6)}`;
 }
 
 function randomSegment(length: number) {

@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 enum Role { user, bot }
 
+enum MessageDeliveryState { completed, pending, failed, interrupted }
+
 class ChatImageAttachment {
   final Uint8List bytes;
   final String name;
@@ -144,6 +146,8 @@ class ChatMessage {
   final List<GeneratedImageAsset> generatedImages;
   final List<ChatImageAttachment> localImages;
   final ImageGenerationOptions? generationOptions;
+  final MessageDeliveryState deliveryState;
+  final String? remoteTaskId;
 
   ChatMessage({
     this.id,
@@ -152,10 +156,23 @@ class ChatMessage {
     this.generatedImages = const [],
     this.localImages = const [],
     this.generationOptions,
+    this.deliveryState = MessageDeliveryState.completed,
+    this.remoteTaskId,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
   bool get hasImages => generatedImages.isNotEmpty || localImages.isNotEmpty;
+  bool get isPending => deliveryState == MessageDeliveryState.pending;
+  bool get isInterrupted => deliveryState == MessageDeliveryState.interrupted;
+  bool get isFailed => deliveryState == MessageDeliveryState.failed;
+  bool get hasResolvableRemoteTask =>
+      role == Role.bot &&
+      remoteTaskId != null &&
+      remoteTaskId!.trim().isNotEmpty &&
+      generatedImages.isEmpty &&
+      !isFailed;
+  bool get shouldShowGenerationPlaceholder =>
+      (hasResolvableRemoteTask && text.trim() == '正在生成图片...') || isPending;
 }
 
 class ChatSessionInfo {

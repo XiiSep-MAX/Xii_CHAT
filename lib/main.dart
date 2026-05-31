@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -25,6 +27,43 @@ import 'update_service.dart';
 void main() {
   EnvConfig.load();
   runApp(const AIChatApp());
+}
+
+class _AppChromePalette {
+  static const Color bg = Color(0xFF020617);
+  static const Color panel = Color(0xFF0B1120);
+  static const Color panelSoft = Color(0xFF0F172A);
+  static const Color panelElevated = Color(0xFF111C34);
+  static const Color panelAccent = Color(0xFF172554);
+  static const Color border = Color(0xFF223257);
+  static const Color borderSoft = Color(0xFF1B2946);
+  static const Color text = Color(0xFFE5EEFf);
+  static const Color textMuted = Color(0xFF8EA4C8);
+  static const Color textSoft = Color(0xFF647BA3);
+  static const Color accent = Color(0xFF60A5FA);
+  static const Color accentStrong = Color(0xFF1D4ED8);
+  static const Color cyan = Color(0xFF38BDF8);
+
+  static LinearGradient get appBackground => const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color(0xFF020617),
+          Color(0xFF081226),
+          Color(0xFF0F172A),
+          Color(0xFF172554),
+        ],
+        stops: [0.0, 0.28, 0.72, 1.0],
+      );
+
+  static LinearGradient get panelGradient => const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color(0xFF0F172A),
+          Color(0xFF111C34),
+        ],
+      );
 }
 
 class _OutpaintRequest {
@@ -129,35 +168,35 @@ class AIChatApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = ColorScheme(
-      brightness: Brightness.light,
-      primary: const Color(0xFF111827),
+      brightness: Brightness.dark,
+      primary: _AppChromePalette.accentStrong,
       onPrimary: Colors.white,
-      primaryContainer: const Color(0xFFE8EEF7),
-      onPrimaryContainer: const Color(0xFF0F172A),
-      secondary: const Color(0xFF2563EB),
-      onSecondary: Colors.white,
-      secondaryContainer: const Color(0xFFE8F0FF),
-      onSecondaryContainer: const Color(0xFF122B55),
-      tertiary: const Color(0xFF0F766E),
-      onTertiary: Colors.white,
-      tertiaryContainer: const Color(0xFFD7F5EF),
-      onTertiaryContainer: const Color(0xFF103A37),
+      primaryContainer: _AppChromePalette.panelAccent,
+      onPrimaryContainer: _AppChromePalette.text,
+      secondary: _AppChromePalette.accent,
+      onSecondary: const Color(0xFF03111F),
+      secondaryContainer: const Color(0xFF10213D),
+      onSecondaryContainer: const Color(0xFFD7EBFF),
+      tertiary: _AppChromePalette.cyan,
+      onTertiary: const Color(0xFF03111F),
+      tertiaryContainer: const Color(0xFF082F49),
+      onTertiaryContainer: const Color(0xFFD8F3FF),
       error: const Color(0xFFB42318),
       onError: Colors.white,
-      errorContainer: const Color(0xFFFEE4E2),
-      onErrorContainer: const Color(0xFF55160C),
-      surface: const Color(0xFFF8FAFC),
-      onSurface: const Color(0xFF0F172A),
-      surfaceContainerHighest: const Color(0xFFE2E8F0),
-      onSurfaceVariant: const Color(0xFF64748B),
-      outline: const Color(0xFFCBD5E1),
-      outlineVariant: const Color(0xFFE2E8F0),
+      errorContainer: const Color(0xFF4C1111),
+      onErrorContainer: const Color(0xFFFECACA),
+      surface: _AppChromePalette.panel,
+      onSurface: _AppChromePalette.text,
+      surfaceContainerHighest: _AppChromePalette.panelElevated,
+      onSurfaceVariant: _AppChromePalette.textMuted,
+      outline: _AppChromePalette.border,
+      outlineVariant: _AppChromePalette.borderSoft,
       shadow: Colors.black,
       scrim: Colors.black,
-      inverseSurface: const Color(0xFF0F172A),
-      onInverseSurface: const Color(0xFFF8FAFC),
-      inversePrimary: const Color(0xFFBFDBFE),
-      surfaceTint: const Color(0xFF111827),
+      inverseSurface: _AppChromePalette.text,
+      onInverseSurface: _AppChromePalette.bg,
+      inversePrimary: const Color(0xFFD7EBFF),
+      surfaceTint: _AppChromePalette.accentStrong,
     );
 
     return MaterialApp(
@@ -165,7 +204,7 @@ class AIChatApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: colorScheme,
         useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFEEF2F7),
+        scaffoldBackgroundColor: _AppChromePalette.bg,
         fontFamily: 'Segoe UI',
         appBarTheme: AppBarTheme(
           backgroundColor: Colors.transparent,
@@ -180,7 +219,7 @@ class AIChatApp extends StatelessWidget {
           ),
         ),
         cardTheme: CardThemeData(
-          color: Colors.white,
+          color: _AppChromePalette.panelElevated,
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(28),
@@ -192,9 +231,9 @@ class AIChatApp extends StatelessWidget {
           thickness: 1,
         ),
         snackBarTheme: SnackBarThemeData(
-          backgroundColor: const Color(0xFF111827),
+          backgroundColor: _AppChromePalette.panelElevated,
           contentTextStyle: const TextStyle(
-            color: Colors.white,
+            color: _AppChromePalette.text,
             fontWeight: FontWeight.w500,
           ),
           shape: RoundedRectangleBorder(
@@ -204,8 +243,8 @@ class AIChatApp extends StatelessWidget {
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            backgroundColor: colorScheme.secondary,
-            foregroundColor: colorScheme.onSecondary,
+            backgroundColor: _AppChromePalette.accentStrong,
+            foregroundColor: Colors.white,
             elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             shape: RoundedRectangleBorder(
@@ -221,7 +260,7 @@ class AIChatApp extends StatelessWidget {
             foregroundColor: colorScheme.onSurface,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             side: BorderSide(
-              color: colorScheme.outline.withValues(alpha: 0.5),
+              color: colorScheme.outline.withValues(alpha: 0.9),
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -241,41 +280,1398 @@ class AIChatApp extends StatelessWidget {
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: Colors.white,
+          fillColor: _AppChromePalette.panelSoft,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
             borderSide: BorderSide(
-              color: colorScheme.outline.withValues(alpha: 0.5),
+              color: colorScheme.outline.withValues(alpha: 0.9),
             ),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
             borderSide: BorderSide(
-              color: colorScheme.outline.withValues(alpha: 0.5),
+              color: colorScheme.outline.withValues(alpha: 0.9),
             ),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
             borderSide: BorderSide(
-              color: colorScheme.secondary.withValues(alpha: 0.7),
+              color: _AppChromePalette.accent.withValues(alpha: 0.95),
               width: 1.4,
             ),
           ),
         ),
       ),
-      home: const ChatScreen(),
+      home: const _SplashIntroGate(),
     );
   }
 }
 
+class _SplashIntroGate extends StatefulWidget {
+  const _SplashIntroGate();
+
+  @override
+  State<_SplashIntroGate> createState() => _SplashIntroGateState();
+}
+
+class _SplashIntroGateState extends State<_SplashIntroGate>
+    with SingleTickerProviderStateMixin {
+  static const Duration _minimumIntroDuration = Duration(milliseconds: 3600);
+
+  late final AnimationController _controller;
+  bool _minimumDurationElapsed = false;
+  bool _initializationComplete = false;
+  bool _showIntro = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: _minimumIntroDuration,
+    )..forward();
+    Future<void>.delayed(_minimumIntroDuration, () {
+      if (!mounted) return;
+      _minimumDurationElapsed = true;
+      _tryDismissIntro();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleInitializationChanged(bool isInitializing) {
+    final completed = !isInitializing;
+    if (_initializationComplete == completed) {
+      return;
+    }
+    _initializationComplete = completed;
+    _tryDismissIntro();
+  }
+
+  void _tryDismissIntro() {
+    if (!mounted || !_showIntro) return;
+    if (!_minimumDurationElapsed || !_initializationComplete) {
+      return;
+    }
+    setState(() {
+      _showIntro = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        ChatScreen(
+          key: const ValueKey('chat-home'),
+          showInitializationIndicator: false,
+          onInitializationChanged: _handleInitializationChanged,
+        ),
+        IgnorePointer(
+          ignoring: !_showIntro,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 650),
+            curve: Curves.easeInOutCubic,
+            opacity: _showIntro ? 1 : 0,
+            child: _SplashIntroScene(
+              controller: _controller,
+              initializationComplete: _initializationComplete,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SplashIntroScene extends StatelessWidget {
+  final AnimationController controller;
+  final bool initializationComplete;
+
+  const _SplashIntroScene({
+    required this.controller,
+    required this.initializationComplete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: AnimatedBuilder(
+        animation: controller,
+        builder: (context, child) {
+          final t = Curves.easeInOutCubic.transform(controller.value);
+          final entrance = Curves.easeOutExpo.transform(
+            (controller.value / 0.36).clamp(0.0, 1.0),
+          );
+          final settle = Curves.easeInOut.transform(
+            ((controller.value - 0.18) / 0.5).clamp(0.0, 1.0),
+          );
+          final scan = Curves.easeInOutSine.transform(
+            ((controller.value - 0.12) / 0.76).clamp(0.0, 1.0),
+          );
+          final outro = Curves.easeInCubic.transform(
+            ((controller.value - 0.78) / 0.22).clamp(0.0, 1.0),
+          );
+
+          return DecoratedBox(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF020617),
+                  Color(0xFF06111F),
+                  Color(0xFF081A2F),
+                  Color(0xFF0A2744),
+                ],
+                stops: [0.0, 0.34, 0.76, 1.0],
+              ),
+            ),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _IntroBackgroundPainter(
+                      progress: t,
+                      scanProgress: scan,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 64,
+                  left: 28,
+                  child: Opacity(
+                    opacity: 0.55 + (0.45 * entrance),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'XII RAW GRAPH',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.96),
+                            fontSize: 14,
+                            letterSpacing: 4.8,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'HOLOGRAPHIC CREATIVE CONSOLE',
+                          style: TextStyle(
+                            color: const Color(0xFF7DD3FC)
+                                .withValues(alpha: 0.72),
+                            fontSize: 10.5,
+                            letterSpacing: 2.2,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 62,
+                  right: 28,
+                  child: Opacity(
+                    opacity: 0.42 + (0.58 * entrance),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.04),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: const Color(0xFF67E8F9).withValues(alpha: 0.22),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF22D3EE)
+                                .withValues(alpha: 0.10),
+                            blurRadius: 18,
+                            spreadRadius: -6,
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'SYSTEM READY',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.52),
+                              fontSize: 10,
+                              letterSpacing: 1.8,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            initializationComplete ? '100%' : '${(controller.value * 100).round()}%',
+                            style: const TextStyle(
+                              color: Color(0xFFBAE6FD),
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned.fill(
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 28,
+                        vertical: 30,
+                      ),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final stageWidth =
+                              math.min(constraints.maxWidth * 0.82, 760.0);
+                          final stageHeight =
+                              math.min(constraints.maxHeight * 0.44, 360.0);
+                          return Column(
+                            children: [
+                              const Spacer(),
+                              Transform.translate(
+                                offset: Offset(0, 16 * (1 - entrance)),
+                                child: Opacity(
+                                  opacity: 1 - (outro * 1.15).clamp(0.0, 1.0),
+                                  child: Column(
+                                    children: [
+                                      SizedBox(
+                                        width: stageWidth,
+                                        height: stageHeight,
+                                        child: _IntroStage(
+                                          entrance: entrance,
+                                          settle: settle,
+                                          scan: scan,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 38),
+                                      Transform.translate(
+                                        offset: Offset(0, 18 * (1 - entrance)),
+                                        child: Opacity(
+                                          opacity: entrance,
+                                          child: Column(
+                                            children: [
+                                              ShaderMask(
+                                                shaderCallback: (bounds) {
+                                                  return const LinearGradient(
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
+                                                    colors: [
+                                                      Color(0xFFE0F2FE),
+                                                      Color(0xFFA5F3FC),
+                                                      Color(0xFF67E8F9),
+                                                    ],
+                                                  ).createShader(bounds);
+                                                },
+                                                child: const Text(
+                                                  '全息创作中枢已就绪',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 40,
+                                                    height: 1.08,
+                                                    fontWeight: FontWeight.w900,
+                                                    letterSpacing: -1.2,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 14),
+                                              ConstrainedBox(
+                                                constraints: const BoxConstraints(
+                                                  maxWidth: 760,
+                                                ),
+                                                child: Text(
+                                                  'Xii_Raw Graph 把本地会话记忆、AI 生图历史、参考图工作流、未完成任务续跑整合进一套桌面创作控制台。重开应用，也能无缝接回上次生成现场。',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    color: Colors.white
+                                                        .withValues(alpha: 0.76),
+                                                    fontSize: 15,
+                                                    height: 1.55,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 18),
+                                              Wrap(
+                                                alignment: WrapAlignment.center,
+                                                spacing: 10,
+                                                runSpacing: 10,
+                                                children: const [
+                                                  _IntroFeatureChip(
+                                                    label: '本地会话自动恢复',
+                                                  ),
+                                                  _IntroFeatureChip(
+                                                    label: '未完成生成继续轮询',
+                                                  ),
+                                                  _IntroFeatureChip(
+                                                    label: '参考图扩图 / 局部重绘',
+                                                  ),
+                                                  _IntroFeatureChip(
+                                                    label: '提示词模板与生图历史',
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const Spacer(flex: 2),
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Opacity(
+                                  opacity: 0.5 + (0.5 * settle),
+                                  child: Column(
+                                    children: [
+                                      SizedBox(
+                                        width: 180,
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(999),
+                                          child: LinearProgressIndicator(
+                                            value: initializationComplete
+                                                ? 1
+                                                : controller.value,
+                                            minHeight: 4,
+                                            backgroundColor: Colors.white
+                                                .withValues(alpha: 0.10),
+                                            valueColor:
+                                                const AlwaysStoppedAnimation(
+                                              Color(0xFF93C5FD),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        initializationComplete
+                                            ? '本地中枢已恢复，可以继续创作'
+                                            : '正在同步本地会话、授权状态、任务轮询与图像记录',
+                                        style: TextStyle(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.46),
+                                          fontSize: 11.8,
+                                          letterSpacing: 1.4,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _IntroStage extends StatelessWidget {
+  final double entrance;
+  final double settle;
+  final double scan;
+
+  const _IntroStage({
+    required this.entrance,
+    required this.settle,
+    required this.scan,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final shellTilt = (1 - settle) * 0.5;
+    final shellTurn = (1 - entrance) * 0.78;
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Transform.translate(
+          offset: Offset(0, 46 * (1 - entrance)),
+          child: Opacity(
+            opacity: 0.52 * settle,
+            child: Container(
+              width: 360,
+              height: 360,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFF22D3EE).withValues(alpha: 0.34),
+                    const Color(0xFF0EA5E9).withValues(alpha: 0.12),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()
+            ..setEntry(3, 2, 0.0014)
+            ..rotateX(0.92 - shellTilt)
+            ..rotateZ(-0.22),
+          child: Container(
+            width: 470,
+            height: 470,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              gradient: RadialGradient(
+                colors: [
+                  const Color(0xFF67E8F9).withValues(alpha: 0.06),
+                  Colors.white.withValues(alpha: 0.0),
+                ],
+              ),
+            ),
+            child: CustomPaint(
+              painter: _IntroRingPainter(scan: scan),
+            ),
+          ),
+        ),
+        Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()
+            ..setEntry(3, 2, 0.0015)
+            ..rotateX(0.28 - (0.15 * settle))
+            ..rotateY(-shellTurn + 0.06 * math.sin(settle * math.pi * 1.6)),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              _IntroPanel(
+                width: 440,
+                height: 244,
+                offset: const Offset(-12, 22),
+                colorA: const Color(0xFF071424),
+                colorB: const Color(0xFF0A2744),
+                borderColor: const Color(0xFF67E8F9).withValues(alpha: 0.14),
+                shadowColor: const Color(0xFF22D3EE).withValues(alpha: 0.18),
+                child: const _IntroPanelGrid(),
+              ),
+              _IntroPanel(
+                width: 368,
+                height: 206,
+                offset: Offset(
+                  12 * math.sin(scan * math.pi * 1.2),
+                  -10 + (10 * (1 - entrance)),
+                ),
+                colorA: const Color(0xFF050B16),
+                colorB: const Color(0xFF10243D),
+                borderColor: const Color(0xFFBAE6FD).withValues(alpha: 0.18),
+                shadowColor: const Color(0xFF0EA5E9).withValues(alpha: 0.18),
+                child: _IntroCenterPanel(scan: scan),
+              ),
+              _IntroPanel(
+                width: 164,
+                height: 108,
+                offset: Offset(-168 - (34 * (1 - settle)), -98),
+                colorA: const Color(0xFF071424),
+                colorB: const Color(0xFF11324E),
+                borderColor: const Color(0xFF67E8F9).withValues(alpha: 0.16),
+                shadowColor: const Color(0xFF06B6D4).withValues(alpha: 0.16),
+                child: _MiniPanel(label: '本地会话', value: '自动续接'),
+              ),
+              _IntroPanel(
+                width: 164,
+                height: 108,
+                offset: Offset(170 + (30 * (1 - settle)), -82),
+                colorA: const Color(0xFF071826),
+                colorB: const Color(0xFF103B52),
+                borderColor: const Color(0xFF93C5FD).withValues(alpha: 0.16),
+                shadowColor: const Color(0xFF38BDF8).withValues(alpha: 0.16),
+                child: _MiniPanel(label: '生图任务', value: '断点续跑'),
+              ),
+              _IntroPanel(
+                width: 164,
+                height: 108,
+                offset: Offset(-152 - (28 * (1 - settle)), 108),
+                colorA: const Color(0xFF08131E),
+                colorB: const Color(0xFF134E4A),
+                borderColor: const Color(0xFF5EEAD4).withValues(alpha: 0.18),
+                shadowColor: const Color(0xFF14B8A6).withValues(alpha: 0.16),
+                child: _MiniPanel(label: '参考图工作流', value: '扩图 / 重绘'),
+              ),
+              _IntroPanel(
+                width: 164,
+                height: 108,
+                offset: Offset(184 + (30 * (1 - settle)), 102),
+                colorA: const Color(0xFF111827),
+                colorB: const Color(0xFF1E3A8A),
+                borderColor: const Color(0xFFC4B5FD).withValues(alpha: 0.18),
+                shadowColor: const Color(0xFFA78BFA).withValues(alpha: 0.16),
+                child: _MiniPanel(label: '素材沉淀', value: '历史与模板'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _IntroPanel extends StatelessWidget {
+  final double width;
+  final double height;
+  final Offset offset;
+  final Color colorA;
+  final Color colorB;
+  final Color borderColor;
+  final Color shadowColor;
+  final Widget child;
+
+  const _IntroPanel({
+    required this.width,
+    required this.height,
+    required this.offset,
+    required this.colorA,
+    required this.colorB,
+    required this.borderColor,
+    required this.shadowColor,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.translate(
+      offset: offset,
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: borderColor),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              colorA.withValues(alpha: 0.94),
+              colorB.withValues(alpha: 0.82),
+            ],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: shadowColor,
+              blurRadius: 34,
+              spreadRadius: -10,
+              offset: const Offset(0, 22),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(27),
+          child: Stack(
+            children: [
+              Positioned.fill(child: child),
+              const Positioned.fill(child: _IntroHudCorners()),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _IntroPanelGrid extends StatelessWidget {
+  const _IntroPanelGrid();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _IntroPanelGridPainter(),
+      child: Container(),
+    );
+  }
+}
+
+class _IntroCenterPanel extends StatelessWidget {
+  final double scan;
+
+  const _IntroCenterPanel({
+    required this.scan,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final activeIndex = scan < 0.25
+        ? 0
+        : scan < 0.5
+            ? 1
+            : scan < 0.75
+                ? 2
+                : 3;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF67E8F9).withValues(alpha: 0.07),
+                  Colors.transparent,
+                  const Color(0xFF0EA5E9).withValues(alpha: 0.05),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          left: 18,
+          top: 16,
+          child: Text(
+            'CREATIVE SYSTEM OVERVIEW',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.62),
+              fontSize: 11,
+              letterSpacing: 2.1,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        Positioned(
+          left: 18,
+          right: 18,
+          top: 50,
+          bottom: 44,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxHeight < 150;
+              if (compact) {
+                final tileWidth = (constraints.maxWidth - 8) / 2;
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    SizedBox(
+                      width: tileWidth,
+                      child: _StartupMetricCompactCard(
+                        label: '会话记忆',
+                        value: '自动恢复',
+                        isActive: activeIndex == 0,
+                      ),
+                    ),
+                    SizedBox(
+                      width: tileWidth,
+                      child: _StartupMetricCompactCard(
+                        label: '生成任务',
+                        value: '继续轮询',
+                        isActive: activeIndex == 1,
+                      ),
+                    ),
+                    SizedBox(
+                      width: tileWidth,
+                      child: _StartupMetricCompactCard(
+                        label: '参考图',
+                        value: '扩图 / 重绘',
+                        isActive: activeIndex == 2,
+                      ),
+                    ),
+                    SizedBox(
+                      width: tileWidth,
+                      child: _StartupMetricCompactCard(
+                        label: '素材沉淀',
+                        value: '历史 / 模板',
+                        isActive: activeIndex == 3,
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              return Column(
+                children: [
+                  Expanded(
+                    child: CustomPaint(
+                      painter: _IntroWavePainter(scan: scan),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _StartupMetricRow(
+                    label: '本地会话记忆',
+                    value: '自动恢复',
+                    isActive: activeIndex == 0,
+                  ),
+                  const SizedBox(height: 8),
+                  _StartupMetricRow(
+                    label: '未完成生成',
+                    value: '继续轮询',
+                    isActive: activeIndex == 1,
+                  ),
+                  const SizedBox(height: 8),
+                  _StartupMetricRow(
+                    label: '参考图工作流',
+                    value: '扩图 / 重绘',
+                    isActive: activeIndex == 2,
+                  ),
+                  const SizedBox(height: 8),
+                  _StartupMetricRow(
+                    label: '提示词与图库沉淀',
+                    value: '历史 / 模板',
+                    isActive: activeIndex == 3,
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        Positioned(
+          left: 18,
+          right: 18,
+          bottom: 16,
+          child: Row(
+            children: [
+              _StatusDot(color: const Color(0xFF34D399), pulse: scan),
+              const SizedBox(width: 8),
+              Text(
+                initializationLabel(scan),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.72),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String initializationLabel(double scan) {
+    if (scan < 0.25) {
+      return '正在连接本地创作中枢';
+    }
+    if (scan < 0.5) {
+      return '正在恢复最近会话与生成记录';
+    }
+    if (scan < 0.75) {
+      return '正在接管未完成任务与参考图状态';
+    }
+    return '正在校验授权状态并准备回到工作台';
+  }
+}
+
+class _MiniPanel extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _MiniPanel({
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.50),
+              fontSize: 10.5,
+              letterSpacing: 1.8,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Color(0xFFE0F2FE),
+              fontSize: 17,
+              height: 1.1,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StartupMetricRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool isActive;
+
+  const _StartupMetricRow({
+    required this.label,
+    required this.value,
+    required this.isActive,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = isActive ? const Color(0xFF67E8F9) : Colors.white;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: isActive ? 0.08 : 0.03),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: accent.withValues(alpha: isActive ? 0.34 : 0.08),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: isActive ? 1 : 0.45),
+              shape: BoxShape.circle,
+              boxShadow: isActive
+                  ? [
+                      BoxShadow(
+                        color: accent.withValues(alpha: 0.42),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : null,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.74),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              color: accent.withValues(alpha: isActive ? 0.96 : 0.58),
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StartupMetricCompactCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool isActive;
+
+  const _StartupMetricCompactCard({
+    required this.label,
+    required this.value,
+    required this.isActive,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = isActive ? const Color(0xFF67E8F9) : Colors.white;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: isActive ? 0.08 : 0.03),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: accent.withValues(alpha: isActive ? 0.34 : 0.08),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.58),
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: accent.withValues(alpha: isActive ? 0.96 : 0.78),
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IntroFeatureChip extends StatelessWidget {
+  final String label;
+
+  const _IntroFeatureChip({
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: const Color(0xFF67E8F9).withValues(alpha: 0.18),
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.84),
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _IntroHudCorners extends StatelessWidget {
+  const _IntroHudCorners();
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: CustomPaint(
+        painter: _IntroHudCornersPainter(),
+      ),
+    );
+  }
+}
+
+class _StatusDot extends StatelessWidget {
+  final Color color;
+  final double pulse;
+
+  const _StatusDot({
+    required this.color,
+    required this.pulse,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = 0.85 + (0.35 * math.sin(pulse * math.pi));
+    return Transform.scale(
+      scale: scale,
+      child: Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.42),
+              blurRadius: 12,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IntroBackgroundPainter extends CustomPainter {
+  final double progress;
+  final double scanProgress;
+
+  const _IntroBackgroundPainter({
+    required this.progress,
+    required this.scanProgress,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final glowPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFF0EA5E9).withValues(alpha: 0.30),
+          Colors.transparent,
+        ],
+      ).createShader(
+        Rect.fromCircle(
+          center: Offset(size.width * 0.78, size.height * 0.22),
+          radius: size.shortestSide * 0.42,
+        ),
+      );
+    canvas.drawRect(Offset.zero & size, glowPaint);
+
+    final glowPaintLeft = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFF14B8A6).withValues(alpha: 0.14),
+          Colors.transparent,
+        ],
+      ).createShader(
+        Rect.fromCircle(
+          center: Offset(size.width * 0.18, size.height * 0.82),
+          radius: size.shortestSide * 0.46,
+        ),
+      );
+    canvas.drawRect(Offset.zero & size, glowPaintLeft);
+
+    final gridPaint = Paint()
+      ..color = const Color(0xFFBAE6FD).withValues(alpha: 0.07)
+      ..strokeWidth = 1;
+    const spacing = 42.0;
+    for (double x = -spacing; x < size.width + spacing; x += spacing) {
+      final dx = x + (scanProgress * 10);
+      canvas.drawLine(
+        Offset(dx, 0),
+        Offset(dx - 30, size.height),
+        gridPaint,
+      );
+    }
+    for (double y = 0; y < size.height + spacing; y += spacing) {
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(size.width, y),
+        gridPaint,
+      );
+    }
+
+    final ringPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = const Color(0xFF67E8F9).withValues(alpha: 0.10);
+    for (int i = 0; i < 4; i++) {
+      final radius = size.shortestSide * (0.18 + (i * 0.11));
+      canvas.drawCircle(
+        Offset(size.width * 0.72, size.height * 0.46),
+        radius,
+        ringPaint,
+      );
+    }
+
+    final beamX =
+        ui.lerpDouble(-size.width * 0.3, size.width * 1.1, scanProgress)!;
+    final beamPaint = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          Colors.transparent,
+          const Color(0xFFE0F2FE).withValues(alpha: 0.12),
+          const Color(0xFF67E8F9).withValues(alpha: 0.22),
+          Colors.transparent,
+        ],
+      ).createShader(
+        Rect.fromLTWH(beamX - 80, 0, 160, size.height),
+      );
+    canvas.drawRect(Rect.fromLTWH(beamX - 80, 0, 160, size.height), beamPaint);
+
+    final vignette = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          Colors.transparent,
+          const Color(0xFF020617).withValues(alpha: 0.18),
+          const Color(0xFF020617).withValues(alpha: 0.62),
+        ],
+        stops: const [0.45, 0.78, 1.0],
+      ).createShader(Offset.zero & size);
+    canvas.drawRect(Offset.zero & size, vignette);
+  }
+
+  @override
+  bool shouldRepaint(covariant _IntroBackgroundPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.scanProgress != scanProgress;
+  }
+}
+
+class _IntroRingPainter extends CustomPainter {
+  final double scan;
+
+  const _IntroRingPainter({
+    required this.scan,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) {
+      return;
+    }
+
+    final center = size.center(Offset.zero);
+    final basePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..color = const Color(0xFFBAE6FD).withValues(alpha: 0.10);
+    canvas.drawCircle(center, size.width * 0.22, basePaint);
+    canvas.drawCircle(center, size.width * 0.32, basePaint);
+    canvas.drawCircle(center, size.width * 0.42, basePaint);
+
+    final dashPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.3
+      ..color = const Color(0xFF67E8F9).withValues(alpha: 0.22);
+    for (int i = 0; i < 24; i++) {
+      final angle = (math.pi * 2 * i / 24) + (scan * math.pi * 0.35);
+      final start = Offset(
+        center.dx + math.cos(angle) * size.width * 0.45,
+        center.dy + math.sin(angle) * size.width * 0.45,
+      );
+      final end = Offset(
+        center.dx + math.cos(angle) * size.width * 0.49,
+        center.dy + math.sin(angle) * size.width * 0.49,
+      );
+      canvas.drawLine(start, end, dashPaint);
+    }
+
+    final activePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 2
+      ..shader = SweepGradient(
+        colors: [
+          Colors.transparent,
+          const Color(0xFF67E8F9).withValues(alpha: 0.0),
+          const Color(0xFF67E8F9).withValues(alpha: 0.95),
+          Colors.transparent,
+        ],
+        stops: const [0.0, 0.42, 0.62, 1.0],
+        transform: GradientRotation(scan * math.pi * 2.0),
+      ).createShader(
+        Rect.fromCircle(center: center, radius: size.width * 0.42),
+      );
+    canvas.drawCircle(center, size.width * 0.42, activePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _IntroRingPainter oldDelegate) {
+    return oldDelegate.scan != scan;
+  }
+}
+
+class _IntroPanelGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = const Color(0xFFBAE6FD).withValues(alpha: 0.08)
+      ..strokeWidth = 1;
+    for (double x = 18; x < size.width; x += 24) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), linePaint);
+    }
+    for (double y = 16; y < size.height; y += 22) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
+    }
+
+    final accentPaint = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          Colors.transparent,
+          const Color(0xFF22D3EE).withValues(alpha: 0.28),
+          Colors.transparent,
+        ],
+      ).createShader(Rect.fromLTWH(0, size.height * 0.52, size.width, 34));
+    canvas.drawRect(
+      Rect.fromLTWH(0, size.height * 0.52, size.width, 34),
+      accentPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _IntroWavePainter extends CustomPainter {
+  final double scan;
+
+  const _IntroWavePainter({
+    required this.scan,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) {
+      return;
+    }
+
+    final rect = Offset.zero & size;
+    final safeWidth = size.width <= 0 ? 1.0 : size.width;
+    final fill = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          const Color(0xFF22D3EE).withValues(alpha: 0.14),
+          const Color(0xFF38BDF8).withValues(alpha: 0.08),
+          Colors.transparent,
+        ],
+      ).createShader(rect);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(18)),
+      fill,
+    );
+
+    final path = Path();
+    for (int i = 0; i <= size.width; i++) {
+      final x = i.toDouble();
+      final baseY = size.height * 0.54;
+      final y = baseY +
+          math.sin((x / safeWidth) * math.pi * 2.6 + (scan * math.pi * 2.1)) *
+              14 +
+          math.cos((x / safeWidth) * math.pi * 6.4 - (scan * math.pi * 1.4)) *
+              6;
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+
+    final glow = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10)
+      ..color = const Color(0xFF67E8F9).withValues(alpha: 0.30);
+    canvas.drawPath(path, glow);
+
+    final line = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8
+      ..shader = LinearGradient(
+        colors: [
+          const Color(0xFFBAE6FD),
+          const Color(0xFF67E8F9),
+        ],
+      ).createShader(rect);
+    canvas.drawPath(path, line);
+
+    final markerX = size.width * scan;
+    final markerY = size.height * 0.54 +
+        math.sin((markerX / safeWidth) * math.pi * 2.6 +
+                (scan * math.pi * 2.1)) *
+            14 +
+        math.cos((markerX / safeWidth) * math.pi * 6.4 -
+                (scan * math.pi * 1.4)) *
+            6;
+    final markerPaint = Paint()..color = Colors.white;
+    canvas.drawCircle(Offset(markerX, markerY), 3.5, markerPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _IntroWavePainter oldDelegate) {
+    return oldDelegate.scan != scan;
+  }
+}
+
+class _IntroHudCornersPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF67E8F9).withValues(alpha: 0.34)
+      ..strokeWidth = 1.4
+      ..style = PaintingStyle.stroke;
+
+    const segment = 18.0;
+    final r = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      const Radius.circular(27),
+    );
+    canvas.drawLine(
+      Offset(r.left + 10, r.top + 8),
+      Offset(r.left + 10 + segment, r.top + 8),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(r.left + 8, r.top + 10),
+      Offset(r.left + 8, r.top + 10 + segment),
+      paint,
+    );
+
+    canvas.drawLine(
+      Offset(r.right - 10 - segment, r.top + 8),
+      Offset(r.right - 10, r.top + 8),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(r.right - 8, r.top + 10),
+      Offset(r.right - 8, r.top + 10 + segment),
+      paint,
+    );
+
+    canvas.drawLine(
+      Offset(r.left + 8, r.bottom - 10 - segment),
+      Offset(r.left + 8, r.bottom - 10),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(r.left + 10, r.bottom - 8),
+      Offset(r.left + 10 + segment, r.bottom - 8),
+      paint,
+    );
+
+    canvas.drawLine(
+      Offset(r.right - 8, r.bottom - 10 - segment),
+      Offset(r.right - 8, r.bottom - 10),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(r.right - 10 - segment, r.bottom - 8),
+      Offset(r.right - 10, r.bottom - 8),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  final bool showInitializationIndicator;
+  final ValueChanged<bool>? onInitializationChanged;
+
+  const ChatScreen({
+    super.key,
+    this.showInitializationIndicator = true,
+    this.onInitializationChanged,
+  });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen>
+    with SingleTickerProviderStateMixin {
   static const String _appVersion = '1.2.12';
   static const String _privacyAcknowledgedKey = 'privacy_acknowledged_v1';
   static const String _retainReferenceImagesKey = 'retain_reference_images_v1';
@@ -340,10 +1736,23 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isComposerDragTargetActive = false;
   bool _isSending = false;
   bool _isInitializing = true;
+  final Set<String> _pollingTaskIds = <String>{};
+  late final AnimationController _composerAuraController;
+
+  bool get _hasPendingGenerationInActiveSession =>
+      _messages.any((message) => message.isPending);
+
+  bool get _isGenerationLocked =>
+      _isSending || _hasPendingGenerationInActiveSession;
 
   @override
   void initState() {
     super.initState();
+    _composerAuraController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3200),
+    )..repeat(reverse: true);
+    widget.onInitializationChanged?.call(true);
     _initializeLocalState();
     _checkForUpdates();
   }
@@ -391,6 +1800,8 @@ class _ChatScreenState extends State<ChatScreen> {
           ..addAll(imageHistory);
         _isInitializing = false;
       });
+      widget.onInitializationChanged?.call(false);
+      _resumePendingTasksForActiveSession();
       if (privacyAcknowledged != 'true') {
         WidgetsBinding.instance.addPostFrameCallback((_) async {
           if (!mounted) return;
@@ -403,6 +1814,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _isInitializing = false;
       });
+      widget.onInitializationChanged?.call(false);
       _showErrorDialog('本地数据初始化失败：$e');
     }
   }
@@ -1077,6 +2489,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _composerAuraController.dispose();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -1103,8 +2516,125 @@ class _ChatScreenState extends State<ChatScreen> {
     return null;
   }
 
+  void _resumePendingTasksForActiveSession() {
+    final activeSession = _activeSession;
+    if (activeSession == null) {
+      return;
+    }
+
+    for (final message in _messages) {
+      final taskId = message.remoteTaskId;
+      if (message.id != null &&
+          taskId != null &&
+          taskId.isNotEmpty &&
+          message.hasResolvableRemoteTask) {
+        unawaited(
+          _pollGenerationTask(
+            sessionId: activeSession.id,
+            messageId: message.id!,
+            taskId: taskId,
+            options: message.generationOptions ?? _generationOptions.normalized(),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _pollGenerationTask({
+    required int sessionId,
+    required int messageId,
+    required String taskId,
+    required ImageGenerationOptions options,
+  }) async {
+    if (!_pollingTaskIds.add(taskId)) {
+      return;
+    }
+
+    try {
+      for (var attempt = 0; attempt < 120; attempt++) {
+        final response = await _chatService.fetchWorkerTask(
+          taskId: taskId,
+          options: options,
+        );
+
+        if (response.taskStatus == 'completed') {
+          var licenseStatus = _licenseStatus ?? await _licenseService.initialize();
+          if (!licenseStatus.isPremium) {
+            licenseStatus = await _licenseService.consumeTrialUse();
+          } else {
+            licenseStatus = await _licenseService.refreshLicenseStatus();
+          }
+
+          final completedMessage = ChatMessage(
+            id: messageId,
+            text: response.text,
+            role: Role.bot,
+            createdAt: DateTime.now(),
+            generatedImages: response.generatedImages,
+            generationOptions: options,
+            deliveryState: MessageDeliveryState.completed,
+            remoteTaskId: taskId,
+          );
+          final savedMessage = await _storageService.updateMessage(
+            messageId: messageId,
+            message: completedMessage,
+          );
+          final sessions = await _storageService.loadSessions();
+          final history = await _storageService.loadGeneratedImageHistory();
+          if (!mounted) return;
+          setState(() {
+            _licenseStatus = licenseStatus;
+            final index = _messages.indexWhere((message) => message.id == messageId);
+            if (index >= 0 && savedMessage != null) {
+              _messages[index] = savedMessage;
+            }
+            _sessions
+              ..clear()
+              ..addAll(sessions);
+            _generatedImageHistory
+              ..clear()
+              ..addAll(history);
+          });
+          _scrollToBottom();
+          return;
+        }
+
+        if (response.taskStatus == 'failed') {
+          final failedMessage = ChatMessage(
+            id: messageId,
+            text: response.text,
+            role: Role.bot,
+            createdAt: DateTime.now(),
+            generationOptions: options,
+            deliveryState: MessageDeliveryState.failed,
+            remoteTaskId: taskId,
+          );
+          final savedMessage = await _storageService.updateMessage(
+            messageId: messageId,
+            message: failedMessage,
+          );
+          if (!mounted) return;
+          setState(() {
+            final index = _messages.indexWhere((message) => message.id == messageId);
+            if (index >= 0 && savedMessage != null) {
+              _messages[index] = savedMessage;
+            }
+          });
+          _scrollToBottom();
+          return;
+        }
+
+        await Future<void>.delayed(const Duration(seconds: 2));
+      }
+    } catch (_) {
+      // Leave pending state in place; it can be resumed on next app open.
+    } finally {
+      _pollingTaskIds.remove(taskId);
+    }
+  }
+
   Future<void> _openSession(int sessionId, {bool recordSwitch = true}) async {
-    if (_isSending) {
+    if (_isGenerationLocked) {
       _showSnackBar('当前正在生成图片，请稍后再切换会话。');
       return;
     }
@@ -1133,6 +2663,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ..addAll(history);
         _selectedImageAttachments.clear();
       });
+      _resumePendingTasksForActiveSession();
       _scrollToBottom();
     } catch (e) {
       if (!mounted) return;
@@ -1141,7 +2672,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _createSession() async {
-    if (_isSending) {
+    if (_isGenerationLocked) {
       _showSnackBar('当前正在生成图片，请稍后再新建会话。');
       return;
     }
@@ -1172,7 +2703,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _renameSession(ChatSessionInfo session) async {
-    if (_isSending) {
+    if (_isGenerationLocked) {
       _showSnackBar('当前正在生成图片，请稍后再重命名会话。');
       return;
     }
@@ -1233,7 +2764,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _deleteSession(ChatSessionInfo session) async {
-    if (_isSending) {
+    if (_isGenerationLocked) {
       _showSnackBar('当前正在生成图片，请稍后再删除会话。');
       return;
     }
@@ -1313,7 +2844,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _clearMessages() async {
     final activeSession = _activeSession;
     if (activeSession == null) return;
-    if (_isSending) {
+    if (_isGenerationLocked) {
       _showSnackBar('当前正在生成图片，请稍后再清空会话。');
       return;
     }
@@ -1390,7 +2921,7 @@ class _ChatScreenState extends State<ChatScreen> {
     return _SessionSidebar(
       sessions: _sessions,
       activeSession: _activeSession,
-      isBusy: _isSending || _isInitializing,
+      isBusy: _isGenerationLocked || _isInitializing,
       brandTitle: 'Xii_Raw Graph',
       brandBadge: '${_licenseStatus?.badgeLabel ?? '授权读取中'} · v$_appVersion',
       onOpenPrivacy: () async {
@@ -1749,12 +3280,76 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
+    ChatMessage? savedPendingBotMessage;
     try {
+      final pendingBotMessage = ChatMessage(
+        text: '正在生成图片...',
+        role: Role.bot,
+        generationOptions: requestOptions,
+        deliveryState: MessageDeliveryState.pending,
+      );
+      savedPendingBotMessage = await _storageService.saveMessage(
+        sessionId: activeSession.id,
+        message: pendingBotMessage,
+      );
+      if (!mounted) return;
+      setState(() {
+        _messages.add(savedPendingBotMessage!);
+      });
+      _scrollToBottom();
+
       final response = await _chatService.sendMessage(
         prompt: text,
         options: requestOptions,
         imageAttachments: imageAttachments,
       );
+      final taskId = response.taskId;
+      if (taskId != null && taskId.isNotEmpty) {
+        final pendingWithTask = ChatMessage(
+          id: savedPendingBotMessage.id,
+          text: savedPendingBotMessage.text,
+          role: savedPendingBotMessage.role,
+          createdAt: savedPendingBotMessage.createdAt,
+          generatedImages: savedPendingBotMessage.generatedImages,
+          localImages: savedPendingBotMessage.localImages,
+          generationOptions: savedPendingBotMessage.generationOptions,
+          deliveryState: savedPendingBotMessage.deliveryState,
+          remoteTaskId: taskId,
+        );
+        final updatedPendingMessage = await _storageService.updateMessage(
+          messageId: savedPendingBotMessage.id!,
+          message: pendingWithTask,
+        );
+        if (updatedPendingMessage != null) {
+          savedPendingBotMessage = updatedPendingMessage;
+          if (mounted) {
+            setState(() {
+              final index = _messages.indexWhere(
+                (message) => message.id == savedPendingBotMessage!.id,
+              );
+              if (index >= 0) {
+                _messages[index] = savedPendingBotMessage!;
+              }
+            });
+          }
+        }
+      }
+
+      if (response.taskStatus != 'completed') {
+        final pendingTaskId = savedPendingBotMessage.remoteTaskId;
+        if (pendingTaskId != null) {
+          unawaited(
+            _pollGenerationTask(
+              sessionId: activeSession.id,
+              messageId: savedPendingBotMessage.id!,
+              taskId: pendingTaskId,
+              options: requestOptions,
+            ),
+          );
+        }
+        return;
+      }
+
       if (!licenseStatus.isPremium) {
         licenseStatus = await _licenseService.consumeTrialUse();
       } else {
@@ -1765,9 +3360,11 @@ class _ChatScreenState extends State<ChatScreen> {
         role: Role.bot,
         generatedImages: response.generatedImages,
         generationOptions: requestOptions,
+        deliveryState: MessageDeliveryState.completed,
+        remoteTaskId: savedPendingBotMessage.remoteTaskId,
       );
-      final savedBotMessage = await _storageService.saveMessage(
-        sessionId: activeSession.id,
+      final savedBotMessage = await _storageService.updateMessage(
+        messageId: savedPendingBotMessage.id!,
         message: botMessage,
       );
       final sessions = await _storageService.loadSessions();
@@ -1778,7 +3375,12 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       setState(() {
         _licenseStatus = licenseStatus;
-        _messages.add(savedBotMessage);
+        final index = _messages.indexWhere(
+          (message) => message.id == savedPendingBotMessage!.id,
+        );
+        if (index >= 0 && savedBotMessage != null) {
+          _messages[index] = savedBotMessage;
+        }
         _sessions
           ..clear()
           ..addAll(sessions);
@@ -1793,12 +3395,18 @@ class _ChatScreenState extends State<ChatScreen> {
         text: '生成失败：${error.toString()}',
         role: Role.bot,
         generationOptions: requestOptions,
+        deliveryState: MessageDeliveryState.failed,
       );
       try {
-        final savedErrorMessage = await _storageService.saveMessage(
-          sessionId: activeSession.id,
-          message: errorMessage,
-        );
+        final savedErrorMessage = savedPendingBotMessage != null
+            ? await _storageService.updateMessage(
+                messageId: savedPendingBotMessage.id!,
+                message: errorMessage,
+              )
+            : await _storageService.saveMessage(
+                sessionId: activeSession.id,
+                message: errorMessage,
+              );
         final sessions = await _storageService.loadSessions();
         final refreshedActiveSession =
             _findSessionById(sessions, activeSession.id) ?? activeSession;
@@ -1806,7 +3414,16 @@ class _ChatScreenState extends State<ChatScreen> {
         if (!mounted) return;
         setState(() {
           _licenseStatus = licenseStatus;
-          _messages.add(savedErrorMessage);
+          if (savedPendingBotMessage != null) {
+            final index = _messages.indexWhere(
+              (message) => message.id == savedPendingBotMessage!.id,
+            );
+            if (index >= 0 && savedErrorMessage != null) {
+              _messages[index] = savedErrorMessage;
+            }
+          } else if (savedErrorMessage != null) {
+            _messages.add(savedErrorMessage);
+          }
           _sessions
             ..clear()
             ..addAll(sessions);
@@ -1834,7 +3451,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (activeSession == null) {
       return;
     }
-    if (_isSending) {
+    if (_isGenerationLocked) {
       _showSnackBar('当前正在生成图片，请稍后再编辑。');
       return;
     }
@@ -2069,7 +3686,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (activeSession == null) {
       return;
     }
-    if (_isSending) {
+    if (_isGenerationLocked) {
       _showSnackBar('当前正在生成图片，请稍后再编辑。');
       return;
     }
@@ -2261,7 +3878,7 @@ class _ChatScreenState extends State<ChatScreen> {
             : 0.0;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      backgroundColor: _AppChromePalette.bg,
       drawer: isWideLayout
           ? null
           : Drawer(
@@ -2274,84 +3891,88 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: _buildSessionPanel(closeDrawerOnAction: true),
               ),
             ),
-      body: SafeArea(
-        child: _isInitializing
-            ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: 36,
-                      height: 36,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Theme.of(context).colorScheme.primary,
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: _AppChromePalette.appBackground,
+        ),
+        child: SafeArea(
+          child: _isInitializing && widget.showInitializationIndicator
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 36,
+                        height: 36,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Theme.of(context).colorScheme.primary,
+                          ),
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      Text(
+                        '正在初始化本地会话数据库...',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : Stack(
+                  children: [
+                    Row(
+                      children: [
+                        if (isWideLayout)
+                          SizedBox(
+                            width: sidebarWidth,
+                            child: Padding(
+                              padding: EdgeInsets.fromLTRB(
+                                0,
+                                workspacePadding,
+                                0,
+                                workspacePadding,
+                              ),
+                              child: _buildSessionPanel(
+                                closeDrawerOnAction: false,
+                              ),
+                            ),
+                          ),
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              isWideLayout ? 0 : workspacePadding,
+                              workspacePadding,
+                              workspacePadding,
+                              workspacePadding,
+                            ),
+                            child: _buildChatWorkspace(
+                              isWideLayout: isWideLayout,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      '正在初始化本地会话数据库...',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.w600,
+                    Positioned(
+                      left: isWideLayout ? sidebarWidth : 0,
+                      right: 0,
+                      bottom: 0,
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          isWideLayout ? 16 : workspacePadding + 16,
+                          0,
+                          workspacePadding + 16,
+                          24,
+                        ),
+                        child: _buildFloatingComposerOverlay(),
                       ),
                     ),
                   ],
                 ),
-              )
-            : Row(
-                children: [
-                  if (isWideLayout)
-                    SizedBox(
-                      width: sidebarWidth,
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          0,
-                          workspacePadding,
-                          0,
-                          workspacePadding,
-                        ),
-                        child: _buildSessionPanel(closeDrawerOnAction: false),
-                      ),
-                    ),
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        isWideLayout ? 0 : workspacePadding,
-                        workspacePadding,
-                        workspacePadding,
-                        workspacePadding,
-                      ),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(
-                            isWideLayout ? 0 : 32,
-                          ),
-                          border: Border.all(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.outline.withValues(alpha: 0.3),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF0F172A)
-                                  .withValues(alpha: 0.08),
-                              blurRadius: 38,
-                              offset: const Offset(0, 20),
-                            ),
-                          ],
-                        ),
-                        child: _buildChatWorkspace(
-                          isWideLayout: isWideLayout,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+        ),
       ),
     );
   }
@@ -2361,13 +3982,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }) {
     final activeSession = _activeSession;
     final licenseStatus = _licenseStatus;
-    final width = MediaQuery.of(context).size.width;
+    final viewportSize = MediaQuery.of(context).size;
+    final width = viewportSize.width;
     final contentMaxWidth = width < 980 ? double.infinity : 980.0;
-    final composerMaxWidth = width < 720
-        ? double.infinity
-        : width < 980
-            ? 760.0
-            : 820.0;
+    final composerReservedHeight = _measureComposerReservedHeight(
+      width: width,
+      licenseStatus: licenseStatus,
+    );
 
     return Column(
       children: [
@@ -2420,274 +4041,341 @@ class _ChatScreenState extends State<ChatScreen> {
               ],
             ),
           ),
-        if (activeSession != null)
-          SizedBox(
-            width: double.infinity,
-            child: _WorkspaceStatusStrip(
-              session: activeSession,
-              licenseStatus: licenseStatus,
-              onRefresh: _refreshLicenseStatus,
-              onContactAuthor: _showAuthorContactDialog,
-              onActivate: _showActivationDialog,
-            ),
-          ),
         Expanded(
-          child: _messages.isEmpty
-              ? LayoutBuilder(
-                  builder: (context, constraints) => SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight,
-                      ),
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        child: ConstrainedBox(
-                          constraints:
-                              BoxConstraints(maxWidth: contentMaxWidth),
-                          child: _EmptyWorkspaceHero(
-                            title: activeSession == null
-                                ? (licenseStatus?.isPremium ?? false)
-                                    ? '欢迎使用 Xii_Raw Graph 高级版'
-                                    : '欢迎使用 Xii_Raw Graph 试用版'
-                                : '欢迎回到「${activeSession.title}」',
-                            subtitle: licenseStatus?.summaryText ??
-                                '现在支持本地 SQLite 会话保存，以及 AI 生图历史回看。',
-                            sessionCount: _sessions.length,
-                            imageHistoryCount: _generatedImageHistory.length,
-                          ),
-                        ),
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  if (activeSession != null)
+                    SizedBox(
+                      width: double.infinity,
+                      child: _WorkspaceStatusStrip(
+                        session: activeSession,
+                        licenseStatus: licenseStatus,
+                        onRefresh: _refreshLicenseStatus,
+                        onContactAuthor: _showAuthorContactDialog,
+                        onActivate: _showActivationDialog,
                       ),
                     ),
-                  ),
-                )
-              : ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                  itemCount: _messages.length + (_isSending ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (_isSending && index == _messages.length) {
-                      return Center(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(maxWidth: contentMaxWidth),
-                          child: _GeminiGenerationPlaceholder(
-                            sizeValue: _generationOptions.size,
-                          ),
-                        ),
-                      );
-                    }
-                    final message = _messages[index];
-                    return Center(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(maxWidth: contentMaxWidth),
-                        child: AnimatedMessageBubble(
-                          key: ValueKey(message.id ?? message.createdAt),
-                          message: message,
-                          isNew: index == _messages.length - 1 && !_isSending,
-                          onOutpaintImage: _handleOutpaintFromGeneratedImage,
-                          onInpaintImage: _handleInpaintFromGeneratedImage,
-                          onQuoteImage: _quoteGeneratedImageAsReference,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-        ),
-        const Divider(height: 1),
-        DropTarget(
-          onDragEntered: (_) {
-            if (!mounted) return;
-            setState(() {
-              _isComposerDragTargetActive = true;
-            });
-          },
-          onDragExited: (_) {
-            if (!mounted) return;
-            setState(() {
-              _isComposerDragTargetActive = false;
-            });
-          },
-          onDragDone: (detail) {
-            _handleComposerFileDrop(detail.files);
-          },
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: const BorderRadius.vertical(
-                bottom: Radius.circular(32),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.025),
-                  blurRadius: 16,
-                  offset: const Offset(0, -4),
-                ),
-              ],
-              border: _isComposerDragTargetActive
-                  ? Border.all(
-                      color: Theme.of(context).colorScheme.secondary,
-                      width: 1.4,
-                    )
-                  : null,
-            ),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: composerMaxWidth),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(28),
-                        border: Border.all(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .outline
-                              .withValues(alpha: 0.26),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.035),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _buildComposerField(licenseStatus),
-                          if (_selectedImageAttachments.isNotEmpty) ...[
-                            const SizedBox(height: 12),
-                            _ComposerImagePreview(
-                              attachments: _selectedImageAttachments,
-                              onRemoveAt:
-                                  _isSending ? null : _removeSelectedImageAt,
-                            ),
-                          ],
-                          const SizedBox(height: 12),
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              final compact = constraints.maxWidth < 700;
-                              final controls = <Widget>[
-                                _ComposerPill(
-                                  icon: _selectedImageAttachments.isEmpty
-                                      ? Icons.add_photo_alternate_outlined
-                                      : Icons.collections_rounded,
-                                  label: _selectedImageAttachments.isEmpty
-                                      ? '参考图'
-                                      : '参考图 ${_selectedImageAttachments.length}',
-                                  onTap: _isSending || _activeSession == null
-                                      ? null
-                                      : _pickImage,
+                  Expanded(
+                    child: _messages.isEmpty
+                        ? LayoutBuilder(
+                            builder: (context, constraints) =>
+                                SingleChildScrollView(
+                              padding: EdgeInsets.fromLTRB(
+                                16,
+                                16,
+                                16,
+                                composerReservedHeight,
+                              ),
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minHeight: constraints.maxHeight,
                                 ),
-                                _ComposerDropdownPill(
-                                  label: '尺寸',
-                                  value: _generationOptions.size,
-                                  items: ImageGenerationOptions.availableSizes,
-                                  displayBuilder:
-                                      ImageGenerationOptions.displaySizeLabel,
-                                  onChanged:
-                                      _isSending ? null : _updateGenerationSize,
-                                ),
-                                _ComposerDropdownPill(
-                                  label: '质量',
-                                  value: _generationOptions.quality,
-                                  items:
-                                      ImageGenerationOptions.availableQualities,
-                                  displayBuilder:
-                                      ImageGenerationOptions.displayQualityLabel,
-                                  onChanged: _isSending
-                                      ? null
-                                      : _updateGenerationQuality,
-                                ),
-                              ];
-
-                              if (compact) {
-                                return Column(
-                                  children: [
-                                    Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: Wrap(
-                                        spacing: 8,
-                                        runSpacing: 8,
-                                        children: controls,
-                                      ),
+                                child: Align(
+                                  alignment: Alignment.topCenter,
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxWidth: contentMaxWidth,
                                     ),
-                                    const SizedBox(height: 10),
-                                    Align(
-                                      alignment: Alignment.centerRight,
-                                      child: _buildSendButton(),
-                                    ),
-                                  ],
-                                );
-                              }
-
-                              return Row(
-                                children: [
-                                  Expanded(
-                                    child: SingleChildScrollView(
-                                      scrollDirection: Axis.horizontal,
-                                      child: Row(
-                                        children: [
-                                          for (var i = 0;
-                                              i < controls.length;
-                                              i++) ...[
-                                            if (i > 0) const SizedBox(width: 8),
-                                            controls[i],
-                                          ],
-                                        ],
-                                      ),
+                                    child: _EmptyWorkspaceHero(
+                                      title: activeSession == null
+                                          ? (licenseStatus?.isPremium ?? false)
+                                              ? '欢迎使用 Xii_Raw Graph 高级版'
+                                              : '欢迎使用 Xii_Raw Graph 试用版'
+                                          : '欢迎回到「${activeSession.title}」',
+                                      subtitle: licenseStatus?.summaryText ??
+                                          '现在支持本地 SQLite 会话保存，以及 AI 生图历史回看。',
+                                      sessionCount: _sessions.length,
+                                      imageHistoryCount:
+                                          _generatedImageHistory.length,
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  _buildSendButton(),
-                                ],
+                                ),
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: _scrollController,
+                            padding: EdgeInsets.fromLTRB(
+                              16,
+                              4,
+                              16,
+                              composerReservedHeight,
+                            ),
+                            itemCount: _messages.length,
+                            itemBuilder: (context, index) {
+                              final message = _messages[index];
+                              return Center(
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxWidth: contentMaxWidth,
+                                  ),
+                                  child: AnimatedMessageBubble(
+                                    key: ValueKey(
+                                      message.id ?? message.createdAt,
+                                    ),
+                                    message: message,
+                                    isNew: index == _messages.length - 1,
+                                    onOutpaintImage:
+                                        _handleOutpaintFromGeneratedImage,
+                                    onInpaintImage:
+                                        _handleInpaintFromGeneratedImage,
+                                    onQuoteImage:
+                                        _quoteGeneratedImageAsReference,
+                                  ),
+                                ),
                               );
                             },
                           ),
-                        ],
-                      ),
-                    ),
-                    if (licenseStatus != null && !licenseStatus.isPremium) ...[
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          '目前\$0.08一张。',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ),
+            ],
           ),
         ),
       ],
     );
   }
 
+  double _measureComposerReservedHeight({
+    required double width,
+    required LicenseStatus? licenseStatus,
+  }) {
+    final hasAttachments = _selectedImageAttachments.isNotEmpty;
+    final compact = width < 700;
+    final showTrialFootnote = licenseStatus != null && !licenseStatus.isPremium;
+
+    var height = compact ? 206.0 : 176.0;
+    if (hasAttachments) {
+      height += compact ? 116.0 : 96.0;
+    }
+    if (showTrialFootnote) {
+      height += 28.0;
+    }
+    return height;
+  }
+
+  Widget _buildFloatingComposerOverlay() {
+    final viewportWidth = MediaQuery.of(context).size.width;
+    final licenseStatus = _licenseStatus;
+    final composerMaxWidth = viewportWidth < 720
+        ? double.infinity
+        : viewportWidth < 980
+            ? 760.0
+            : 820.0;
+
+    return DropTarget(
+      onDragEntered: (_) {
+        if (!mounted) return;
+        setState(() {
+          _isComposerDragTargetActive = true;
+        });
+      },
+      onDragExited: (_) {
+        if (!mounted) return;
+        setState(() {
+          _isComposerDragTargetActive = false;
+        });
+      },
+      onDragDone: (detail) {
+        _handleComposerFileDrop(detail.files);
+      },
+      child: AnimatedBuilder(
+        animation: _composerAuraController,
+        builder: (context, child) {
+          const auraPalette = <Color>[
+            Color(0xFF38BDF8),
+            Color(0xFF60A5FA),
+            Color(0xFF22C55E),
+            Color(0xFFF59E0B),
+            Color(0xFFFB7185),
+            Color(0xFFA78BFA),
+          ];
+          final pulse = Curves.easeInOutSine.transform(
+            _composerAuraController.value,
+          );
+          final colorPhase = _composerAuraController.value * auraPalette.length;
+          final colorIndex = colorPhase.floor() % auraPalette.length;
+          final nextColorIndex = (colorIndex + 1) % auraPalette.length;
+          final colorMix = Curves.easeInOut.transform(colorPhase - colorIndex);
+          final auraColor = Color.lerp(
+            auraPalette[colorIndex],
+            auraPalette[nextColorIndex],
+            colorMix,
+          )!;
+          final borderColor = Color.lerp(
+            _AppChromePalette.border,
+            auraColor.withValues(alpha: 0.96),
+            _isComposerDragTargetActive ? 1 : (0.34 + pulse * 0.38),
+          )!;
+          final borderWidth =
+              _isComposerDragTargetActive ? 1.9 : 1.15 + pulse * 0.55;
+          final auraAlpha =
+              _isComposerDragTargetActive ? 0.34 : 0.18 + pulse * 0.20;
+
+          return Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: composerMaxWidth),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                decoration: BoxDecoration(
+                  gradient: _AppChromePalette.panelGradient,
+                  borderRadius: BorderRadius.circular(34),
+                  border: Border.all(
+                    color: borderColor,
+                    width: borderWidth,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.34),
+                      blurRadius: 34,
+                      offset: const Offset(0, 22),
+                    ),
+                    BoxShadow(
+                      color: auraColor.withValues(alpha: auraAlpha),
+                      blurRadius: 40 + (pulse * 18),
+                      spreadRadius: -4 + (pulse * 5),
+                      offset: const Offset(0, 8),
+                    ),
+                    BoxShadow(
+                      color: auraColor.withValues(
+                        alpha: _isComposerDragTargetActive
+                            ? 0.18
+                            : 0.08 + pulse * 0.10,
+                      ),
+                      blurRadius: 72 + (pulse * 24),
+                      spreadRadius: -10 + (pulse * 6),
+                      offset: const Offset(0, 0),
+                    ),
+                  ],
+                ),
+                child: child,
+              ),
+            ),
+          );
+        },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildComposerField(licenseStatus),
+            if (_selectedImageAttachments.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _ComposerImagePreview(
+                attachments: _selectedImageAttachments,
+                onRemoveAt:
+                    _isGenerationLocked ? null : _removeSelectedImageAt,
+              ),
+            ],
+            const SizedBox(height: 12),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 700;
+                final controls = <Widget>[
+                  _ComposerPill(
+                    icon: _selectedImageAttachments.isEmpty
+                        ? Icons.add_photo_alternate_outlined
+                        : Icons.collections_rounded,
+                    label: _selectedImageAttachments.isEmpty
+                        ? '参考图'
+                        : '参考图 ${_selectedImageAttachments.length}',
+                    onTap: _isGenerationLocked || _activeSession == null
+                        ? null
+                        : _pickImage,
+                  ),
+                  _ComposerDropdownPill(
+                    label: '尺寸',
+                    value: _generationOptions.size,
+                    items: ImageGenerationOptions.availableSizes,
+                    displayBuilder: ImageGenerationOptions.displaySizeLabel,
+                    onChanged:
+                        _isGenerationLocked ? null : _updateGenerationSize,
+                  ),
+                  _ComposerDropdownPill(
+                    label: '质量',
+                    value: _generationOptions.quality,
+                    items: ImageGenerationOptions.availableQualities,
+                    displayBuilder: ImageGenerationOptions.displayQualityLabel,
+                    onChanged:
+                        _isGenerationLocked ? null : _updateGenerationQuality,
+                  ),
+                ];
+
+                if (compact) {
+                  return Column(
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: controls,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: _buildSendButton(),
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            for (var i = 0; i < controls.length; i++) ...[
+                              if (i > 0) const SizedBox(width: 8),
+                              controls[i],
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    _buildSendButton(),
+                  ],
+                );
+              },
+            ),
+            if (licenseStatus != null && !licenseStatus.isPremium) ...[
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '目前\$0.08一张。',
+                  style: TextStyle(
+                    color: _AppChromePalette.textMuted,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildComposerField(LicenseStatus? licenseStatus) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: _AppChromePalette.borderSoft,
+        ),
       ),
       child: TextField(
         controller: _controller,
         textInputAction: TextInputAction.send,
         onSubmitted: (_) => _handleSend(),
-        enabled: !_isSending &&
+        enabled: !_isGenerationLocked &&
             !_isInitializing &&
             _activeSession != null &&
             (licenseStatus?.canUseGeneration ?? true),
@@ -2697,14 +4385,11 @@ class _ChatScreenState extends State<ChatScreen> {
               ? '描述你想要的图片，例如：电影感海边日落、暖色调、超细节等...'
               : '输入描述，结合参考图一起生成...',
           hintStyle: TextStyle(
-            color: Theme.of(context)
-                .colorScheme
-                .onSurfaceVariant
-                .withValues(alpha: 0.72),
+            color: _AppChromePalette.textSoft,
           ),
           prefixIcon: Icon(
             Icons.mode_comment_outlined,
-            color: Theme.of(context).colorScheme.secondary,
+            color: _AppChromePalette.accent,
           ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
@@ -2719,21 +4404,27 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildSendButton() {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      width: _isSending ? 48 : 80,
+      width: _isGenerationLocked ? 48 : 80,
       height: 48,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: _isSending
-              ? [Colors.grey.shade400, Colors.grey.shade500]
-              : const [Color(0xFF2563EB), Color(0xFF111827)],
+          colors: _isGenerationLocked
+              ? [const Color(0xFF334155), const Color(0xFF475569)]
+              : const [Color(0xFF38BDF8), Color(0xFF1D4ED8)],
         ),
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: _isGenerationLocked
+              ? const Color(0xFF475569)
+              : const Color(0xFF7DD3FC).withValues(alpha: 0.45),
+        ),
         boxShadow: [
           BoxShadow(
-            color: (_isSending ? Colors.grey : const Color(0xFF2563EB))
-                .withValues(alpha: 0.24),
-            blurRadius: 12,
-            offset: const Offset(0, 8),
+            color:
+                (_isGenerationLocked ? const Color(0xFF334155) : const Color(0xFF38BDF8))
+                    .withValues(alpha: 0.28),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -2741,9 +4432,9 @@ class _ChatScreenState extends State<ChatScreen> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(24),
-          onTap: _isSending || _activeSession == null ? null : _handleSend,
+          onTap: _isGenerationLocked || _activeSession == null ? null : _handleSend,
           child: Center(
-            child: _isSending
+            child: _isGenerationLocked
                 ? const SizedBox(
                     width: 20,
                     height: 20,
@@ -2862,11 +4553,10 @@ class _WorkspaceStatusStrip extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.white.withValues(alpha: 0.04),
         border: Border(
           bottom: BorderSide(
-            color:
-                Theme.of(context).colorScheme.outline.withValues(alpha: 0.14),
+            color: _AppChromePalette.border,
           ),
         ),
       ),
@@ -2877,12 +4567,17 @@ class _WorkspaceStatusStrip extends StatelessWidget {
             width: 28,
             height: 28,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.secondaryContainer,
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF10213D),
+                  Color(0xFF172554),
+                ],
+              ),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               Icons.auto_awesome_rounded,
-              color: Theme.of(context).colorScheme.secondary,
+              color: _AppChromePalette.accent,
               size: 14,
             ),
           ),
@@ -2897,7 +4592,7 @@ class _WorkspaceStatusStrip extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
+                    color: _AppChromePalette.text,
                     fontWeight: FontWeight.w800,
                     fontSize: 13,
                   ),
@@ -2907,7 +4602,7 @@ class _WorkspaceStatusStrip extends StatelessWidget {
                   '消息 ${session.messageCount} 条',
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: _AppChromePalette.textMuted,
                     fontSize: 10.5,
                   ),
                 ),
@@ -2916,10 +4611,7 @@ class _WorkspaceStatusStrip extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurfaceVariant
-                        .withValues(alpha: 0.9),
+                    color: _AppChromePalette.textSoft,
                     fontSize: 10.5,
                   ),
                 ),
@@ -3007,10 +4699,17 @@ class _SessionSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF091120),
+            Color(0xFF0E1A31),
+          ],
+        ),
         border: Border(
           right: BorderSide(
-            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+            color: _AppChromePalette.border,
           ),
         ),
       ),
@@ -3056,7 +4755,7 @@ class _SessionSidebar extends StatelessWidget {
                           Text(
                             brandTitle,
                             style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
+                              color: _AppChromePalette.text,
                               fontWeight: FontWeight.w800,
                               fontSize: 20,
                             ),
@@ -3065,9 +4764,7 @@ class _SessionSidebar extends StatelessWidget {
                           Text(
                             activeSession?.title ?? '准备开始新的图像创作',
                             style: TextStyle(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
+                              color: _AppChromePalette.textMuted,
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
                             ),
@@ -3079,21 +4776,16 @@ class _SessionSidebar extends StatelessWidget {
                               vertical: 5,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
+                              color: Colors.white.withValues(alpha: 0.04),
                               borderRadius: BorderRadius.circular(999),
                               border: Border.all(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .outline
-                                    .withValues(alpha: 0.32),
+                                color: _AppChromePalette.border,
                               ),
                             ),
                             child: Text(
                               brandBadge,
                               style: TextStyle(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
+                                color: _AppChromePalette.textMuted,
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -3135,7 +4827,7 @@ class _SessionSidebar extends StatelessWidget {
                   child: Text(
                     '历史对话',
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: _AppChromePalette.textSoft,
                       fontSize: 11.5,
                       fontWeight: FontWeight.w600,
                     ),
@@ -3160,9 +4852,7 @@ class _SessionSidebar extends StatelessWidget {
                                 '还没有会话，点击上方“新建对话”开始第一条创作。',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
+                                  color: _AppChromePalette.textMuted,
                                   height: 1.6,
                                 ),
                               ),
@@ -3185,18 +4875,34 @@ class _SessionSidebar extends StatelessWidget {
                                     duration: const Duration(milliseconds: 180),
                                     padding: const EdgeInsets.all(13),
                                     decoration: BoxDecoration(
-                                      color: selected
-                                          ? const Color(0xFFE8F0FF)
-                                          : Colors.white,
+                                      gradient: selected
+                                          ? const LinearGradient(
+                                              colors: [
+                                                Color(0xFF10213D),
+                                                Color(0xFF172554),
+                                              ],
+                                            )
+                                          : const LinearGradient(
+                                              colors: [
+                                                Color(0xFF0F172A),
+                                                Color(0xFF111827),
+                                              ],
+                                            ),
                                       borderRadius: BorderRadius.circular(18),
                                       border: Border.all(
                                         color: selected
-                                            ? const Color(0xFFBFDBFE)
-                                            : Theme.of(context)
-                                                .colorScheme
-                                                .outline
-                                                .withValues(alpha: 0.18),
+                                            ? _AppChromePalette.accent
+                                            : _AppChromePalette.borderSoft,
                                       ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(
+                                            alpha: selected ? 0.18 : 0.10,
+                                          ),
+                                          blurRadius: 18,
+                                          offset: const Offset(0, 10),
+                                        ),
+                                      ],
                                     ),
                                     child: Column(
                                       crossAxisAlignment:
@@ -3211,10 +4917,8 @@ class _SessionSidebar extends StatelessWidget {
                                                 overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
                                                   color: selected
-                                                      ? const Color(0xFF1D4ED8)
-                                                      : Theme.of(context)
-                                                          .colorScheme
-                                                          .onSurface,
+                                                      ? Colors.white
+                                                      : _AppChromePalette.text,
                                                   fontWeight: FontWeight.w800,
                                                 ),
                                               ),
@@ -3228,8 +4932,9 @@ class _SessionSidebar extends StatelessWidget {
                                                   vertical: 4,
                                                 ),
                                                 decoration: BoxDecoration(
-                                                  color:
-                                                      const Color(0xFFDBEAFE),
+                                                  color: Colors.white.withValues(
+                                                    alpha: 0.12,
+                                                  ),
                                                   borderRadius:
                                                       BorderRadius.circular(
                                                     999,
@@ -3238,7 +4943,7 @@ class _SessionSidebar extends StatelessWidget {
                                                 child: const Text(
                                                   '当前',
                                                   style: TextStyle(
-                                                    color: Color(0xFFBFDBFE),
+                                                    color: Color(0xFFD7EBFF),
                                                     fontSize: 11,
                                                     fontWeight: FontWeight.w700,
                                                   ),
@@ -3271,10 +4976,8 @@ class _SessionSidebar extends StatelessWidget {
                                                 Icons.more_horiz_rounded,
                                                 size: 18,
                                                 color: selected
-                                                    ? const Color(0xFF1D4ED8)
-                                                    : Theme.of(context)
-                                                        .colorScheme
-                                                        .onSurfaceVariant,
+                                                    ? Colors.white
+                                                    : _AppChromePalette.textMuted,
                                               ),
                                             ),
                                           ],
@@ -3284,11 +4987,8 @@ class _SessionSidebar extends StatelessWidget {
                                           '消息 ${session.messageCount} 条',
                                           style: TextStyle(
                                             color: selected
-                                                ? const Color(0xFF1D4ED8)
-                                                    .withValues(alpha: 0.84)
-                                                : Theme.of(context)
-                                                    .colorScheme
-                                                    .onSurfaceVariant,
+                                                ? const Color(0xFFD7EBFF)
+                                                : _AppChromePalette.textMuted,
                                             fontSize: 12,
                                           ),
                                         ),
@@ -3297,12 +4997,8 @@ class _SessionSidebar extends StatelessWidget {
                                           '最近使用 ${_formatTime(session.sortTime)}',
                                           style: TextStyle(
                                             color: selected
-                                                ? const Color(0xFF1D4ED8)
-                                                    .withValues(alpha: 0.72)
-                                                : Theme.of(context)
-                                                    .colorScheme
-                                                    .onSurfaceVariant
-                                                    .withValues(alpha: 0.88),
+                                                ? const Color(0xFFB8D9FF)
+                                                : _AppChromePalette.textSoft,
                                             fontSize: 12,
                                           ),
                                         ),
@@ -3346,12 +5042,20 @@ class _SidebarNavButton extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: highlighted ? const Color(0xFFE8F0FF) : Colors.transparent,
+          gradient: highlighted
+              ? const LinearGradient(
+                  colors: [
+                    Color(0xFF10213D),
+                    Color(0xFF172554),
+                  ],
+                )
+              : null,
+          color: highlighted ? null : Colors.white.withValues(alpha: 0.02),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: highlighted
-                ? const Color(0xFFBFDBFE)
-                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.12),
+                ? _AppChromePalette.accent
+                : _AppChromePalette.borderSoft,
           ),
         ),
         child: Row(
@@ -3360,8 +5064,8 @@ class _SidebarNavButton extends StatelessWidget {
               icon,
               size: 20,
               color: highlighted
-                  ? const Color(0xFF2563EB)
-                  : Theme.of(context).colorScheme.onSurface,
+                  ? Colors.white
+                  : _AppChromePalette.text,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -3369,8 +5073,8 @@ class _SidebarNavButton extends StatelessWidget {
                 label,
                 style: TextStyle(
                   color: highlighted
-                      ? const Color(0xFF1D4ED8)
-                      : Theme.of(context).colorScheme.onSurface,
+                      ? Colors.white
+                      : _AppChromePalette.text,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -3400,10 +5104,10 @@ class _MetricBadge extends StatelessWidget {
       constraints: const BoxConstraints(minWidth: 164),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
+        color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.28),
+          color: _AppChromePalette.borderSoft,
         ),
       ),
       child: Row(
@@ -3413,13 +5117,18 @@ class _MetricBadge extends StatelessWidget {
             width: 30,
             height: 30,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.secondaryContainer,
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF10213D),
+                  Color(0xFF172554),
+                ],
+              ),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               icon,
               size: 15,
-              color: Theme.of(context).colorScheme.secondary,
+              color: _AppChromePalette.accent,
             ),
           ),
           const SizedBox(width: 8),
@@ -3433,7 +5142,7 @@ class _MetricBadge extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: _AppChromePalette.textMuted,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
@@ -3444,7 +5153,7 @@ class _MetricBadge extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
+                    color: _AppChromePalette.text,
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
                   ),
@@ -3479,22 +5188,22 @@ class _EmptyWorkspaceHero extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [
-            Color(0xFFF8FBFF),
-            Color(0xFFF2F7FF),
+            Color(0xFF0F172A),
+            Color(0xFF111C34),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(30),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+          color: _AppChromePalette.border,
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 12),
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: 26,
+            offset: const Offset(0, 16),
           ),
         ],
       ),
@@ -3506,15 +5215,18 @@ class _EmptyWorkspaceHero extends StatelessWidget {
             width: 58,
             height: 58,
             decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.secondaryContainer.withValues(alpha: 0.95),
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF10213D),
+                  Color(0xFF172554),
+                ],
+              ),
               borderRadius: BorderRadius.circular(18),
             ),
             child: Icon(
               Icons.auto_awesome_rounded,
               size: 28,
-              color: Theme.of(context).colorScheme.secondary,
+              color: _AppChromePalette.accent,
             ),
           ),
           const SizedBox(height: 16),
@@ -3524,7 +5236,7 @@ class _EmptyWorkspaceHero extends StatelessWidget {
               fontSize: 22,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.45,
-              color: Theme.of(context).colorScheme.onSurface,
+              color: _AppChromePalette.text,
             ),
           ),
           const SizedBox(height: 8),
@@ -3532,7 +5244,7 @@ class _EmptyWorkspaceHero extends StatelessWidget {
             subtitle,
             style: TextStyle(
               fontSize: 13.5,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: _AppChromePalette.textMuted,
               height: 1.55,
             ),
           ),
@@ -3585,8 +5297,9 @@ class _GeneratedImageHistorySheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        gradient: _AppChromePalette.panelGradient,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border.all(color: _AppChromePalette.border),
       ),
       child: Column(
         children: [
@@ -3595,7 +5308,7 @@ class _GeneratedImageHistorySheet extends StatelessWidget {
             width: 52,
             height: 5,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+              color: _AppChromePalette.border.withValues(alpha: 0.9),
               borderRadius: BorderRadius.circular(999),
             ),
           ),
@@ -3605,14 +5318,14 @@ class _GeneratedImageHistorySheet extends StatelessWidget {
               children: [
                 Icon(
                   Icons.photo_library_outlined,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: _AppChromePalette.accent,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'AI 生图历史',
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
+                      color: _AppChromePalette.text,
                       fontWeight: FontWeight.w700,
                       fontSize: 18,
                     ),
@@ -3621,7 +5334,7 @@ class _GeneratedImageHistorySheet extends StatelessWidget {
                 Text(
                   '${entries.length} 张',
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: _AppChromePalette.textMuted,
                   ),
                 ),
               ],
@@ -3633,7 +5346,7 @@ class _GeneratedImageHistorySheet extends StatelessWidget {
                     child: Text(
                       '还没有 AI 生图历史',
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: _AppChromePalette.textMuted,
                       ),
                     ),
                   )
@@ -3651,16 +5364,15 @@ class _GeneratedImageHistorySheet extends StatelessWidget {
                       final entry = entries[index];
                       return Container(
                         decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest
-                              .withOpacity(0.3),
+                          gradient: const LinearGradient(
+                            colors: [
+                              Color(0xFF0F172A),
+                              Color(0xFF111827),
+                            ],
+                          ),
                           borderRadius: BorderRadius.circular(22),
                           border: Border.all(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .outline
-                                .withOpacity(0.1),
+                            color: _AppChromePalette.borderSoft,
                           ),
                         ),
                         child: Column(
@@ -3694,9 +5406,7 @@ class _GeneratedImageHistorySheet extends StatelessWidget {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurface,
+                                      color: _AppChromePalette.text,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
@@ -3708,9 +5418,7 @@ class _GeneratedImageHistorySheet extends StatelessWidget {
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
+                                      color: _AppChromePalette.textMuted,
                                       height: 1.35,
                                     ),
                                   ),
@@ -3718,9 +5426,7 @@ class _GeneratedImageHistorySheet extends StatelessWidget {
                                   Text(
                                     '${ImageGenerationOptions.displaySizeLabel(entry.size ?? 'auto')} · ${ImageGenerationOptions.displayQualityLabel(entry.quality ?? 'auto')} · ${_formatTime(entry.createdAt)}',
                                     style: TextStyle(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
+                                      color: _AppChromePalette.textSoft,
                                       fontSize: 12,
                                     ),
                                   ),
@@ -3993,22 +5699,40 @@ class ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (message.shouldShowGenerationPlaceholder) {
+      return _GeminiGenerationPlaceholder(
+        sizeValue: message.generationOptions?.size ?? 'auto',
+      );
+    }
+
     final screenWidth = MediaQuery.of(context).size.width;
     final isUser = message.role == Role.user;
-    final bubbleColor =
-        isUser ? const Color(0xFF1E3A5F) : const Color(0xFFF8FAFC);
-    final textColor =
-        isUser ? Colors.white : Theme.of(context).colorScheme.onSurface;
+    final bubbleColor = isUser
+        ? const Color(0xFF17305C)
+        : Colors.white.withValues(alpha: 0.045);
+    final textColor = isUser ? Colors.white : _AppChromePalette.text;
     final avatar = Container(
       width: 36,
       height: 36,
       decoration: BoxDecoration(
-        color: isUser ? const Color(0xFFDBEAFE) : const Color(0xFFE2E8F0),
+        gradient: isUser
+            ? const LinearGradient(
+                colors: [
+                  Color(0xFF1D4ED8),
+                  Color(0xFF38BDF8),
+                ],
+              )
+            : const LinearGradient(
+                colors: [
+                  Color(0xFF111827),
+                  Color(0xFF1E293B),
+                ],
+              ),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Icon(
         isUser ? Icons.person : Icons.smart_toy,
-        color: isUser ? const Color(0xFF2563EB) : const Color(0xFF475569),
+        color: Colors.white,
         size: 18,
       ),
     );
@@ -4107,14 +5831,43 @@ class ChatBubble extends StatelessWidget {
                           Text(
                             'AI 助手',
                             style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
+                              color: _AppChromePalette.textMuted,
                               fontSize: 12.5,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          if (message.text.isNotEmpty) ...[
+                          if (message.isInterrupted || message.isFailed) ...[
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                color: message.isFailed
+                                    ? const Color(0xFFFEF2F2)
+                                    : const Color(0xFFFFF7ED),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(
+                                  color: message.isFailed
+                                      ? const Color(0xFFFCA5A5)
+                                      : const Color(0xFFFCD34D),
+                                ),
+                              ),
+                              child: Text(
+                                message.isFailed
+                                    ? message.text
+                                    : '上次图片生成在应用关闭前未完成，任务已中断，请重新发起。',
+                                style: TextStyle(
+                                  color: message.isFailed
+                                      ? const Color(0xFF991B1B)
+                                      : const Color(0xFF9A3412),
+                                  height: 1.6,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ] else if (message.text.isNotEmpty) ...[
                             const SizedBox(height: 6),
                             ConstrainedBox(
                               constraints: BoxConstraints(
@@ -4237,15 +5990,34 @@ class _CopyableMessageContentState extends State<_CopyableMessageContent> {
               widget.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 24),
-              child: SelectableText(
-                widget.text,
-                textAlign: textAlign,
-                style: TextStyle(
-                  fontSize: 15.5,
-                  color: textColor,
-                  height: textHeight,
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+              decoration: BoxDecoration(
+                color: widget.bubbleColor,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: widget.isUser
+                      ? const Color(0xFF60A5FA).withValues(alpha: 0.26)
+                      : _AppChromePalette.borderSoft,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 14,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 24),
+                child: SelectableText(
+                  widget.text,
+                  textAlign: textAlign,
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    color: textColor,
+                    height: textHeight,
+                  ),
                 ),
               ),
             ),
@@ -4273,16 +6045,12 @@ class _CopyableMessageContentState extends State<_CopyableMessageContent> {
                       icon: Icon(
                         Icons.content_copy_rounded,
                         size: 15,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurfaceVariant,
+                        color: _AppChromePalette.textMuted,
                       ),
                       label: Text(
                         '复制',
                         style: TextStyle(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant,
+                          color: _AppChromePalette.textMuted,
                           fontWeight: FontWeight.w600,
                           fontSize: 12.5,
                         ),
@@ -4361,19 +6129,18 @@ class _ImageDownloadActionState extends State<_ImageDownloadAction> {
 
     return Align(
       alignment: widget.alignment,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.9),
+        child: Container(
+          decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(22),
           border: Border.all(
-            color:
-                Theme.of(context).colorScheme.outline.withValues(alpha: 0.12),
+            color: _AppChromePalette.borderSoft,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 8),
+              color: Colors.black.withValues(alpha: 0.16),
+              blurRadius: 16,
+              offset: const Offset(0, 10),
             ),
           ],
         ),
@@ -4392,20 +6159,20 @@ class _ImageDownloadActionState extends State<_ImageDownloadAction> {
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           value: progress?.progress,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Theme.of(context).colorScheme.primary,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                            _AppChromePalette.accent,
                           ),
                         ),
                       )
                     : Icon(
                         Icons.download_rounded,
-                        color: Theme.of(context).colorScheme.primary,
+                        color: _AppChromePalette.accent,
                         size: 18,
                       ),
                 label: Text(
                   _isDownloading ? '正在下载...' : '下载图片',
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
+                    color: _AppChromePalette.text,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -4431,12 +6198,10 @@ class _ImageDownloadActionState extends State<_ImageDownloadAction> {
                     child: LinearProgressIndicator(
                       value: progress.progress,
                       minHeight: 6,
-                      backgroundColor: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest
-                          .withOpacity(0.5),
+                      backgroundColor:
+                          _AppChromePalette.panelElevated.withValues(alpha: 0.7),
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        Theme.of(context).colorScheme.primary,
+                        _AppChromePalette.accent,
                       ),
                     ),
                   ),
@@ -4447,7 +6212,7 @@ class _ImageDownloadActionState extends State<_ImageDownloadAction> {
                   child: Text(
                     '${progress.message} · ${progress.progressLabel}',
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: _AppChromePalette.textMuted,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
@@ -4476,10 +6241,10 @@ class _ComposerImagePreview extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.12),
+          color: _AppChromePalette.borderSoft,
           width: 1,
         ),
       ),
@@ -4494,7 +6259,7 @@ class _ComposerImagePreview extends StatelessWidget {
                 Text(
                   '已选择参考图（${attachments.length} 张）',
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
+                    color: _AppChromePalette.text,
                     fontWeight: FontWeight.w600,
                     fontSize: 12.5,
                   ),
@@ -4574,9 +6339,7 @@ class _ComposerImagePreview extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
+                                color: _AppChromePalette.textMuted,
                                 fontSize: 10.5,
                               ),
                             ),
@@ -4611,8 +6374,8 @@ class _ComposerPill extends StatelessWidget {
     final enabled = onTap != null;
     return Material(
       color: enabled
-          ? const Color(0xFFF8FAFC)
-          : const Color(0xFFF8FAFC).withValues(alpha: 0.7),
+          ? Colors.white.withValues(alpha: 0.05)
+          : Colors.white.withValues(alpha: 0.025),
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         onTap: onTap,
@@ -4622,8 +6385,7 @@ class _ComposerPill extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
-              color:
-                  Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+              color: _AppChromePalette.borderSoft,
             ),
           ),
           child: Row(
@@ -4633,22 +6395,16 @@ class _ComposerPill extends StatelessWidget {
                 icon,
                 size: 18,
                 color: enabled
-                    ? Theme.of(context).colorScheme.secondary
-                    : Theme.of(context)
-                        .colorScheme
-                        .onSurfaceVariant
-                        .withValues(alpha: 0.5),
+                    ? _AppChromePalette.accent
+                    : _AppChromePalette.textSoft.withValues(alpha: 0.7),
               ),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
                   color: enabled
-                      ? Theme.of(context).colorScheme.onSurface
-                      : Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant
-                          .withValues(alpha: 0.6),
+                      ? _AppChromePalette.text
+                      : _AppChromePalette.textSoft.withValues(alpha: 0.78),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -4681,10 +6437,10 @@ class _ComposerDropdownPill extends StatelessWidget {
       constraints: const BoxConstraints(minWidth: 150, maxWidth: 210),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+          color: _AppChromePalette.borderSoft,
         ),
       ),
       child: DropdownButtonHideUnderline(
@@ -4693,13 +6449,13 @@ class _ComposerDropdownPill extends StatelessWidget {
           isExpanded: true,
           isDense: true,
           borderRadius: BorderRadius.circular(18),
-          dropdownColor: Colors.white,
+          dropdownColor: _AppChromePalette.panelElevated,
           icon: Icon(
             Icons.keyboard_arrow_down_rounded,
-            color: Theme.of(context).colorScheme.primary,
+            color: _AppChromePalette.textMuted,
           ),
           style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface,
+            color: _AppChromePalette.text,
             fontWeight: FontWeight.w600,
           ),
           selectedItemBuilder: (context) => items
@@ -4827,11 +6583,14 @@ class _ChatImageFrame extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: _AppChromePalette.borderSoft,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 18,
-              offset: const Offset(0, 10),
+              color: Colors.black.withValues(alpha: 0.20),
+              blurRadius: 22,
+              offset: const Offset(0, 12),
             ),
           ],
         ),
@@ -5827,7 +7586,6 @@ class _GeminiGenerationPlaceholderState
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final imageAspectRatio = _resolvePlaceholderAspectRatio(widget.sizeValue);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -5838,12 +7596,17 @@ class _GeminiGenerationPlaceholderState
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: const Color(0xFFE2E8F0),
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF10213D),
+                  Color(0xFF172554),
+                ],
+              ),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
               Icons.auto_awesome_rounded,
-              color: Color(0xFF475569),
+              color: Colors.white,
               size: 18,
             ),
           ),
@@ -5857,7 +7620,7 @@ class _GeminiGenerationPlaceholderState
                   Text(
                     'AI 助手',
                     style: TextStyle(
-                      color: scheme.onSurfaceVariant,
+                      color: _AppChromePalette.textMuted,
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700,
                     ),
@@ -5874,7 +7637,7 @@ class _GeminiGenerationPlaceholderState
                       Text(
                         '正在构图并生成图像…',
                         style: TextStyle(
-                          color: scheme.onSurface,
+                          color: _AppChromePalette.text,
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                         ),
@@ -5934,9 +7697,8 @@ class _GeminiGenerationPlaceholderState
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        final scheme = Theme.of(context).colorScheme;
-        final base = scheme.surfaceContainerHighest.withValues(alpha: 0.65);
-        final glow = const Color(0xFFDBEAFE).withValues(alpha: 0.92);
+        final base = _AppChromePalette.panelElevated.withValues(alpha: 0.92);
+        final glow = const Color(0xFF7DD3FC).withValues(alpha: 0.88);
         final shift = ((_controller.value + delay) % 1.0);
         final textStyle = TextStyle(
           fontSize: 13.5,
@@ -5995,11 +7757,10 @@ class _GeminiGenerationPlaceholderState
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        final scheme = Theme.of(context).colorScheme;
         final shift = _controller.value;
-        final base = scheme.surfaceContainerHighest.withValues(alpha: 0.7);
-        final glowA = const Color(0xFFDBEAFE).withValues(alpha: 0.92);
-        final glowB = const Color(0xFFE9D5FF).withValues(alpha: 0.86);
+        final base = _AppChromePalette.panelElevated.withValues(alpha: 0.86);
+        final glowA = const Color(0xFF7DD3FC).withValues(alpha: 0.84);
+        final glowB = const Color(0xFF93C5FD).withValues(alpha: 0.72);
 
         return Align(
           alignment: Alignment.centerLeft,
@@ -6011,7 +7772,7 @@ class _GeminiGenerationPlaceholderState
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: scheme.outline.withValues(alpha: 0.16),
+                    color: _AppChromePalette.borderSoft,
                   ),
                   gradient: LinearGradient(
                     begin: Alignment(-1.2 + shift * 2.4, -0.8),
@@ -6026,9 +7787,9 @@ class _GeminiGenerationPlaceholderState
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF2563EB).withValues(alpha: 0.08),
-                      blurRadius: 18,
-                      offset: const Offset(0, 10),
+                      color: const Color(0xFF38BDF8).withValues(alpha: 0.14),
+                      blurRadius: 22,
+                      offset: const Offset(0, 12),
                     ),
                   ],
                 ),
@@ -6043,9 +7804,9 @@ class _GeminiGenerationPlaceholderState
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                Colors.white.withValues(alpha: 0.22),
+                                Colors.white.withValues(alpha: 0.10),
                                 Colors.transparent,
-                                Colors.black.withValues(alpha: 0.06),
+                                Colors.black.withValues(alpha: 0.16),
                               ],
                             ),
                           ),
@@ -6057,7 +7818,7 @@ class _GeminiGenerationPlaceholderState
                       child: Icon(
                         Icons.image_search_rounded,
                         size: 34,
-                        color: scheme.onSurfaceVariant.withValues(alpha: 0.45),
+                        color: _AppChromePalette.textMuted.withValues(alpha: 0.6),
                       ),
                     ),
                     Positioned(
@@ -6067,7 +7828,7 @@ class _GeminiGenerationPlaceholderState
                       child: Container(
                         height: 10,
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.32),
+                          color: Colors.white.withValues(alpha: 0.16),
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
@@ -6449,8 +8210,9 @@ class _PromptTemplateLibrarySheetState
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        gradient: _AppChromePalette.panelGradient,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border.all(color: _AppChromePalette.border),
       ),
       child: Column(
         children: [
@@ -6459,9 +8221,7 @@ class _PromptTemplateLibrarySheetState
             height: 5,
             margin: const EdgeInsets.only(top: 10, bottom: 8),
             decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.outline.withValues(alpha: 0.18),
+              color: _AppChromePalette.border.withValues(alpha: 0.9),
               borderRadius: BorderRadius.circular(999),
             ),
           ),
@@ -6471,14 +8231,14 @@ class _PromptTemplateLibrarySheetState
               children: [
                 Icon(
                   Icons.library_books_outlined,
-                  color: Theme.of(context).colorScheme.secondary,
+                  color: _AppChromePalette.accent,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     '提示词模板库',
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
+                      color: _AppChromePalette.text,
                       fontWeight: FontWeight.w800,
                       fontSize: 24,
                     ),
@@ -6513,7 +8273,7 @@ class _PromptTemplateLibrarySheetState
                     child: Text(
                       '当前没有可用模板。',
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: _AppChromePalette.textMuted,
                       ),
                     ),
                   );
@@ -6533,8 +8293,7 @@ class _PromptTemplateLibrarySheetState
                         Text(
                           '${category.title} · 共 ${templates.length} 个模板',
                           style: TextStyle(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: _AppChromePalette.textMuted,
                             height: 1.7,
                           ),
                         ),
@@ -6596,28 +8355,32 @@ class _PromptTemplateLibrarySheetState
                                             vertical: 10,
                                           ),
                                           decoration: BoxDecoration(
+                                            gradient: selected
+                                                ? const LinearGradient(
+                                                    colors: [
+                                                      Color(0xFF10213D),
+                                                      Color(0xFF172554),
+                                                    ],
+                                                  )
+                                                : null,
                                             color: selected
-                                                ? const Color(0xFFE8F0FF)
-                                                : const Color(0xFFF8FAFC),
+                                                ? null
+                                                : Colors.white
+                                                    .withValues(alpha: 0.04),
                                             borderRadius:
                                                 BorderRadius.circular(999),
                                             border: Border.all(
                                               color: selected
-                                                  ? const Color(0xFFBFDBFE)
-                                                  : Theme.of(context)
-                                                      .colorScheme
-                                                      .outline
-                                                      .withValues(alpha: 0.16),
+                                                  ? _AppChromePalette.accent
+                                                  : _AppChromePalette.borderSoft,
                                             ),
                                           ),
                                           child: Text(
                                             item.title,
                                             style: TextStyle(
                                               color: selected
-                                                  ? const Color(0xFF1D4ED8)
-                                                  : Theme.of(context)
-                                                      .colorScheme
-                                                      .onSurface,
+                                                  ? Colors.white
+                                                  : _AppChromePalette.text,
                                               fontWeight: FontWeight.w700,
                                             ),
                                           ),
@@ -6659,22 +8422,14 @@ class _PromptTemplateLibrarySheetState
                             Text(
                               '左右滑动可查看更多分类',
                               style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant.withValues(
-                                      alpha: 0.72,
-                                    ),
+                                color: _AppChromePalette.textSoft,
                                 fontSize: 11.5,
                               ),
                             ),
                             Text(
                               '${selectedIndex + 1}/${categories.length}',
                               style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant.withValues(
-                                      alpha: 0.72,
-                                    ),
+                                color: _AppChromePalette.textSoft,
                                 fontSize: 11.5,
                               ),
                             ),
@@ -6684,8 +8439,7 @@ class _PromptTemplateLibrarySheetState
                         Text(
                           category.description,
                           style: TextStyle(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: _AppChromePalette.textMuted,
                             height: 1.6,
                           ),
                         ),
@@ -6798,8 +8552,9 @@ class _PromptTemplateCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.transparent,
+            color: Colors.white.withValues(alpha: 0.03),
             borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _AppChromePalette.borderSoft),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -6809,7 +8564,7 @@ class _PromptTemplateCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(14),
                   child: Container(
                     width: double.infinity,
-                    color: const Color(0xFFF1F5F9),
+                    color: _AppChromePalette.panelElevated,
                     alignment: Alignment.center,
                     child: CachedNetworkImage(
                       imageUrl: item.coverUrl!,
@@ -6823,7 +8578,7 @@ class _PromptTemplateCard extends StatelessWidget {
                         child: Center(
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Theme.of(context).colorScheme.secondary,
+                            color: _AppChromePalette.accent,
                           ),
                         ),
                       ),
@@ -6832,9 +8587,7 @@ class _PromptTemplateCard extends StatelessWidget {
                         child: Center(
                           child: Icon(
                             Icons.broken_image_outlined,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
+                            color: _AppChromePalette.textMuted,
                           ),
                         ),
                       ),
@@ -6847,7 +8600,7 @@ class _PromptTemplateCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
+                  color: _AppChromePalette.text,
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
                 ),
@@ -6858,7 +8611,7 @@ class _PromptTemplateCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  color: _AppChromePalette.textMuted,
                   fontSize: 11.5,
                 ),
               ),
@@ -6869,9 +8622,7 @@ class _PromptTemplateCard extends StatelessWidget {
                     Icon(
                       Icons.link_rounded,
                       size: 11,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                      color: _AppChromePalette.textSoft,
                     ),
                     const SizedBox(width: 4),
                     Expanded(
@@ -6880,10 +8631,7 @@ class _PromptTemplateCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant
-                              .withValues(alpha: 0.78),
+                          color: _AppChromePalette.textSoft,
                           fontSize: 10.5,
                           fontWeight: FontWeight.w500,
                         ),
@@ -6933,17 +8681,16 @@ class _CategoryScrollArrow extends StatelessWidget {
         width: 30,
         height: 30,
         decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
+          color: Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color:
-                Theme.of(context).colorScheme.outline.withValues(alpha: 0.16),
+            color: _AppChromePalette.borderSoft,
           ),
         ),
         child: Icon(
           icon,
           size: 18,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          color: _AppChromePalette.textMuted,
         ),
       ),
     );

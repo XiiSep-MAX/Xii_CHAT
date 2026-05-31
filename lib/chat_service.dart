@@ -13,10 +13,14 @@ String get openAIApiKey => EnvConfig.getRequired('OPENAI_API_KEY');
 class ChatResponse {
   final String text;
   final List<GeneratedImageAsset> generatedImages;
+  final String? taskId;
+  final String? taskStatus;
 
   ChatResponse({
     required this.text,
     this.generatedImages = const [],
+    this.taskId,
+    this.taskStatus,
   });
 }
 
@@ -287,9 +291,8 @@ class OpenAIChatService {
       throw Exception(_extractErrorMessage(response, body));
     }
 
-    final content = body['content'] ?? body['data'] ?? body;
-    return _parseResponseContent(
-      content,
+    return _parseWorkerTaskResponse(
+      body,
       options: options,
       isEditRequest: imageAttachments.isNotEmpty,
     );
@@ -340,6 +343,39 @@ class OpenAIChatService {
       content,
       options: options,
       isEditRequest: true,
+    );
+  }
+
+  Future<ChatResponse> fetchWorkerTask({
+    required String taskId,
+    required ImageGenerationOptions options,
+    bool isEditRequest = false,
+  }) async {
+    final workerBaseUrl = _workerBaseUrl;
+    if (workerBaseUrl == null || workerBaseUrl.isEmpty) {
+      throw Exception('当前未配置任务查询服务。');
+    }
+
+    final licenseStatus = await LicenseService.instance.initialize();
+    final uri = Uri.parse(
+      '$workerBaseUrl/v1/chat/tasks/$taskId',
+    ).replace(
+      queryParameters: {
+        'token': licenseStatus.licenseToken ?? '',
+        'installId': licenseStatus.installId,
+      },
+    );
+
+    final response = await http.get(uri);
+    final body = _decodeJsonFromResponse(response);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(_extractErrorMessage(response, body));
+    }
+
+    return _parseWorkerTaskResponse(
+      body,
+      options: options,
+      isEditRequest: isEditRequest,
     );
   }
 
@@ -403,6 +439,8 @@ class OpenAIChatService {
     dynamic content, {
     required ImageGenerationOptions options,
     required bool isEditRequest,
+    String? taskId,
+    String? taskStatus,
   }) {
     final generatedImages = <GeneratedImageAsset>[];
     final textParts = <String>[];
@@ -515,14 +553,47 @@ class OpenAIChatService {
       return ChatResponse(
         text: responseText.isEmpty ? fallbackText : responseText,
         generatedImages: generatedImages,
+        taskId: taskId,
+        taskStatus: taskStatus,
       );
     }
 
     if (responseText.isNotEmpty) {
-      return ChatResponse(text: responseText);
+      return ChatResponse(
+        text: responseText,
+        taskId: taskId,
+        taskStatus: taskStatus,
+      );
     }
 
     throw Exception('接口已返回成功，但没有解析到图片结果。');
+  }
+
+  ChatResponse _parseWorkerTaskResponse(
+    Map<String, dynamic> body, {
+    required ImageGenerationOptions options,
+    required bool isEditRequest,
+  }) {
+    final taskId = body['taskId']?.toString();
+    final taskStatus = body['status']?.toString();
+    final content = body['content'];
+    if (taskStatus == 'completed') {
+      return _parseResponseContent(
+        content,
+        options: options,
+        isEditRequest: isEditRequest,
+        taskId: taskId,
+        taskStatus: taskStatus,
+      );
+    }
+
+    return ChatResponse(
+      text: taskStatus == 'failed'
+          ? (body['error']?.toString() ?? '图片生成失败。')
+          : '任务已提交，正在生成中。',
+      taskId: taskId,
+      taskStatus: taskStatus,
+    );
   }
 
   String _extractErrorMessage(

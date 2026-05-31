@@ -12,7 +12,7 @@ class LocalStorageService {
   static final LocalStorageService instance = LocalStorageService._();
 
   static const _databaseName = 'xii_chat_local.db';
-  static const _databaseVersion = 2;
+  static const _databaseVersion = 4;
   static const _legacySwitchLogCleanupStateKey =
       'legacy_session_switch_logs_cleaned_v1';
 
@@ -71,6 +71,8 @@ class LocalStorageService {
         role TEXT NOT NULL,
         text TEXT NOT NULL,
         created_at TEXT NOT NULL,
+        delivery_state TEXT NOT NULL DEFAULT 'completed',
+        remote_task_id TEXT,
         generation_options_json TEXT,
         local_images_json TEXT,
         FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
@@ -130,6 +132,18 @@ class LocalStorageService {
           key TEXT PRIMARY KEY,
           value TEXT NOT NULL
         )
+      ''');
+    }
+    if (oldVersion < 3) {
+      await db.execute('''
+        ALTER TABLE messages
+        ADD COLUMN delivery_state TEXT NOT NULL DEFAULT 'completed'
+      ''');
+    }
+    if (oldVersion < 4) {
+      await db.execute('''
+        ALTER TABLE messages
+        ADD COLUMN remote_task_id TEXT
       ''');
     }
   }
@@ -399,6 +413,10 @@ class LocalStorageService {
         text: (row['text'] as String?) ?? '',
         role: _parseRole((row['role'] as String?) ?? 'bot'),
         createdAt: DateTime.parse(row['created_at'] as String),
+        deliveryState: _parseDeliveryState(
+          (row['delivery_state'] as String?) ?? 'completed',
+        ),
+        remoteTaskId: row['remote_task_id'] as String?,
         generationOptions: _decodeGenerationOptions(
           row['generation_options_json'] as String?,
         ),
@@ -420,6 +438,8 @@ class LocalStorageService {
         'role': message.role.name,
         'text': message.text,
         'created_at': createdAt,
+        'delivery_state': message.deliveryState.name,
+        'remote_task_id': message.remoteTaskId,
         'generation_options_json':
             _encodeGenerationOptions(message.generationOptions),
         'local_images_json': _encodeLocalImages(message.localImages),
@@ -553,6 +573,101 @@ class LocalStorageService {
     );
   }
 
+  Future<ChatMessage?> updateMessage({
+    required int messageId,
+    required ChatMessage message,
+  }) async {
+    final updatedAt = message.createdAt.toIso8601String();
+    final rows = await _db.transaction((txn) async {
+      final existing = await txn.query(
+        'messages',
+        columns: ['session_id'],
+        where: 'id = ?',
+        whereArgs: [messageId],
+        limit: 1,
+      );
+      if (existing.isEmpty) {
+        return null;
+      }
+
+      final sessionId = existing.first['session_id'] as int;
+      await txn.update(
+        'messages',
+        {
+          'role': message.role.name,
+          'text': message.text,
+          'created_at': updatedAt,
+          'delivery_state': message.deliveryState.name,
+          'remote_task_id': message.remoteTaskId,
+          'generation_options_json':
+              _encodeGenerationOptions(message.generationOptions),
+          'local_images_json': _encodeLocalImages(message.localImages),
+        },
+        where: 'id = ?',
+        whereArgs: [messageId],
+      );
+
+      await txn.delete(
+        'generated_images',
+        where: 'message_id = ?',
+        whereArgs: [messageId],
+      );
+
+      for (final image in message.generatedImages) {
+        await txn.insert('generated_images', {
+          'session_id': sessionId,
+          'message_id': messageId,
+          'image_url': image.imageUrl,
+          'image_bytes_base64':
+              image.hasBytes ? base64Encode(image.bytes!) : null,
+          'file_name': image.fileName,
+          'mime_type': image.mimeType,
+          'created_at': updatedAt,
+        });
+      }
+
+      await txn.update(
+        'sessions',
+        {
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [sessionId],
+      );
+
+      return <String, Object?>{
+        'session_id': sessionId,
+      };
+    });
+
+    if (rows == null) {
+      return null;
+    }
+
+    return ChatMessage(
+      id: messageId,
+      text: message.text,
+      role: message.role,
+      createdAt: message.createdAt,
+      generatedImages: message.generatedImages,
+      localImages: message.localImages,
+      generationOptions: message.generationOptions,
+      deliveryState: message.deliveryState,
+      remoteTaskId: message.remoteTaskId,
+    );
+  }
+
+  Future<void> markPendingMessagesInterrupted() async {
+    await _db.update(
+      'messages',
+      {
+        'delivery_state': MessageDeliveryState.interrupted.name,
+      },
+      where: 'delivery_state = ?',
+      whereArgs: [MessageDeliveryState.pending.name],
+    );
+  }
+
   GeneratedImageAsset _mapGeneratedImage(Map<String, Object?> row) {
     final imageBytesBase64 = row['image_bytes_base64'] as String?;
     return GeneratedImageAsset(
@@ -567,6 +682,13 @@ class LocalStorageService {
 
   Role _parseRole(String rawRole) {
     return rawRole == Role.user.name ? Role.user : Role.bot;
+  }
+
+  MessageDeliveryState _parseDeliveryState(String rawState) {
+    return MessageDeliveryState.values.firstWhere(
+      (state) => state.name == rawState,
+      orElse: () => MessageDeliveryState.completed,
+    );
   }
 
   String? _encodeGenerationOptions(ImageGenerationOptions? options) {
