@@ -1,11 +1,11 @@
 {
-  "version": "1.2.12",
-  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.12.zip",
+  "version": "1.2.13",
+  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.13.zip",
   "mirrorUrls": [
-    "https://github.com/XiiSep-MAX/Xii_CHAT/releases/download/v1.2.12/Xii_Raw_Graph_Trial_v1.2.12.zip"
+    "https://github.com/XiiSep-MAX/Xii_CHAT/releases/download/v1.2.13/Xii_Raw_Graph_Trial_v1.2.13.zip"
   ],
-  "sha256": "674579f25053963afa29f9f27b7124175f1d906fcefd298d2183af6ebd9f33dc",
-  "releaseNotes": "🎨 1.2.12 对话体验与品牌升级版\n\n本次更新包含：\n- 生成图支持一键引用到对话，直接作为参考图继续生成\n- 生成中的动画改成更接近 Gemini 的内容流反馈，并按尺寸显示占位比例\n- 用户与 AI 消息的复制入口改为悬停显示，布局更稳定\n- 应用品牌 Logo 与 Web / Windows 图标已更新为专属版本",
+  "sha256": "04103d79d4df14eac666b36f0fa23fe8f0381d91c4e402fc714003eaf5ebf883",
+  "releaseNotes": "🎨 1.2.13 对话体验与品牌升级版\n\n本次更新包含：\n- 生成图支持一键引用到对话，直接作为参考图继续生成\n- 生成中的动画改成更接近 Gemini 的内容流反馈，并按尺寸显示占位比例\n- 用户与 AI 消息的复制入口改为悬停显示，布局更稳定\n- 应用品牌 Logo 与 Web / Windows 图标已更新为专属版本",
   "isForced": false,
-  "signature": "m3zsTP56b++rj8mLMefEquj1/ueh/WCx7xug3YWugCE02nJejaXFm3VxtPz+tVzWm36kUDP0S351BaSDdyXkDA=="
+  "signature": ""
 }
