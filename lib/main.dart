@@ -1740,7 +1740,13 @@ class _ChatScreenState extends State<ChatScreen>
   late final AnimationController _composerAuraController;
 
   bool get _hasPendingGenerationInActiveSession =>
-      _messages.any((message) => message.isPending);
+      _messages.any(
+        (message) =>
+            message.role == Role.bot &&
+            (message.isPending ||
+                message.isInterrupted ||
+                message.hasResolvableRemoteTask),
+      );
 
   bool get _isGenerationLocked =>
       _isSending || _hasPendingGenerationInActiveSession;
