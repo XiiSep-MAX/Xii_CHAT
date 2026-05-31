@@ -1024,16 +1024,65 @@ async function handleGenerate(
     }),
   );
 
+  if (referenceImages.length > 0) {
+    const upstreamResponse = await sendImageEditRequest(env, {
+      prompt,
+      size: requestSize,
+      quality: requestQuality,
+      referenceImages,
+    });
+
+    const upstreamText = await upstreamResponse.text();
+    const payloadJson = safeParseJson(upstreamText);
+    if (!upstreamResponse.ok) {
+      const upstreamError = describeUpstreamError(
+        upstreamResponse.status,
+        payloadJson,
+        upstreamText,
+      );
+      return json(
+        {
+          error: upstreamError.message,
+          upstreamStatus: upstreamResponse.status,
+          upstreamDetail: upstreamError.detail,
+        },
+        upstreamResponse.status,
+      );
+    }
+
+    await appendEvent(env, license.id, "generate", {
+      mode: "direct_reference",
+      size: requestSize,
+      quality: requestQuality,
+      referenceImageCount: referenceImages.length,
+    });
+
+    return json(
+      {
+        taskId: null,
+        status: "completed",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+        error: null,
+        content:
+          payloadJson?.choices?.[0]?.message?.content ??
+          payloadJson?.data ??
+          payloadJson,
+      },
+      200,
+    );
+  }
+
   const task = await createGenerationTask(env, {
-    taskType: referenceImages.length === 0 ? "generate" : "edit_from_reference",
+    taskType: "generate",
     idempotencyKey,
     licenseCodeId: license.id,
     installIdHash,
     prompt,
     requestSize,
     requestQuality,
-    referenceImagesJson:
-      referenceImages.length > 0 ? JSON.stringify(referenceImages) : null,
+    referenceImagesJson: null,
   });
 
   await env.GENERATION_QUEUE.send({
