@@ -42,6 +42,7 @@ class LocalStorageService {
       ),
     );
 
+    await _ensureSchemaCompatibility();
     await _cleanupLegacySessionSwitchLogsIfNeeded();
   }
 
@@ -146,6 +147,136 @@ class LocalStorageService {
         ADD COLUMN remote_task_id TEXT
       ''');
     }
+  }
+
+  Future<void> _ensureSchemaCompatibility() async {
+    await _db.transaction((txn) async {
+      await txn.execute('''
+        CREATE TABLE IF NOT EXISTS sessions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          last_activated_at TEXT
+        )
+      ''');
+
+      await txn.execute('''
+        CREATE TABLE IF NOT EXISTS messages (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id INTEGER NOT NULL,
+          role TEXT NOT NULL,
+          text TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          delivery_state TEXT NOT NULL DEFAULT 'completed',
+          remote_task_id TEXT,
+          generation_options_json TEXT,
+          local_images_json TEXT,
+          FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
+        )
+      ''');
+
+      await txn.execute('''
+        CREATE TABLE IF NOT EXISTS generated_images (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id INTEGER NOT NULL,
+          message_id INTEGER NOT NULL,
+          image_url TEXT,
+          image_bytes_base64 TEXT,
+          file_name TEXT NOT NULL DEFAULT 'generated.png',
+          mime_type TEXT NOT NULL DEFAULT 'image/png',
+          created_at TEXT NOT NULL,
+          FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+          FOREIGN KEY(message_id) REFERENCES messages(id) ON DELETE CASCADE
+        )
+      ''');
+
+      await txn.execute('''
+        CREATE TABLE IF NOT EXISTS session_switch_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id INTEGER NOT NULL,
+          switched_at TEXT NOT NULL,
+          FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
+        )
+      ''');
+
+      await txn.execute('''
+        CREATE TABLE IF NOT EXISTS app_state (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        )
+      ''');
+
+      await _ensureColumnExists(
+        txn,
+        table: 'messages',
+        column: 'delivery_state',
+        definition: "TEXT NOT NULL DEFAULT 'completed'",
+      );
+      await _ensureColumnExists(
+        txn,
+        table: 'messages',
+        column: 'remote_task_id',
+        definition: 'TEXT',
+      );
+      await _ensureColumnExists(
+        txn,
+        table: 'messages',
+        column: 'generation_options_json',
+        definition: 'TEXT',
+      );
+      await _ensureColumnExists(
+        txn,
+        table: 'messages',
+        column: 'local_images_json',
+        definition: 'TEXT',
+      );
+      await _ensureColumnExists(
+        txn,
+        table: 'generated_images',
+        column: 'image_bytes_base64',
+        definition: 'TEXT',
+      );
+      await _ensureColumnExists(
+        txn,
+        table: 'generated_images',
+        column: 'file_name',
+        definition: "TEXT NOT NULL DEFAULT 'generated.png'",
+      );
+      await _ensureColumnExists(
+        txn,
+        table: 'generated_images',
+        column: 'mime_type',
+        definition: "TEXT NOT NULL DEFAULT 'image/png'",
+      );
+
+      await txn.execute(
+        'CREATE INDEX IF NOT EXISTS idx_messages_session_created ON messages(session_id, created_at)',
+      );
+      await txn.execute(
+        'CREATE INDEX IF NOT EXISTS idx_generated_images_created ON generated_images(created_at DESC)',
+      );
+      await txn.execute(
+        'CREATE INDEX IF NOT EXISTS idx_session_switch_logs_session ON session_switch_logs(session_id)',
+      );
+    });
+  }
+
+  Future<void> _ensureColumnExists(
+    DatabaseExecutor db, {
+    required String table,
+    required String column,
+    required String definition,
+  }) async {
+    final rows = await db.rawQuery('PRAGMA table_info($table)');
+    final hasColumn = rows.any((row) => row['name']?.toString() == column);
+    if (hasColumn) {
+      return;
+    }
+
+    await db.execute(
+      'ALTER TABLE $table ADD COLUMN $column $definition',
+    );
   }
 
   Future<String?> readAppState(String key) async {
@@ -670,10 +801,16 @@ class LocalStorageService {
 
   GeneratedImageAsset _mapGeneratedImage(Map<String, Object?> row) {
     final imageBytesBase64 = row['image_bytes_base64'] as String?;
+    Uint8List? bytes;
+    if (imageBytesBase64 != null && imageBytesBase64.isNotEmpty) {
+      try {
+        bytes = Uint8List.fromList(base64Decode(imageBytesBase64));
+      } catch (_) {
+        bytes = null;
+      }
+    }
     return GeneratedImageAsset(
-      bytes: imageBytesBase64 == null
-          ? null
-          : Uint8List.fromList(base64Decode(imageBytesBase64)),
+      bytes: bytes,
       imageUrl: row['image_url'] as String?,
       fileName: (row['file_name'] as String?) ?? 'generated.png',
       mimeType: (row['mime_type'] as String?) ?? 'image/png',
@@ -706,7 +843,12 @@ class LocalStorageService {
       return null;
     }
 
-    final decoded = jsonDecode(rawJson);
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(rawJson);
+    } catch (_) {
+      return null;
+    }
     if (decoded is! Map<String, dynamic>) {
       return null;
     }
@@ -767,19 +909,36 @@ class LocalStorageService {
       return const <ChatImageAttachment>[];
     }
 
-    final decoded = jsonDecode(rawJson);
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(rawJson);
+    } catch (_) {
+      return const <ChatImageAttachment>[];
+    }
     if (decoded is! List) {
       return const <ChatImageAttachment>[];
     }
 
-    return decoded.whereType<Map>().map((item) {
+    final attachments = <ChatImageAttachment>[];
+    for (final item in decoded.whereType<Map>()) {
       final bytesBase64 = item['bytesBase64']?.toString() ?? '';
-      return ChatImageAttachment(
-        bytes: Uint8List.fromList(base64Decode(bytesBase64)),
-        name: item['name']?.toString() ?? 'image.png',
-        mimeType: item['mimeType']?.toString() ?? 'image/png',
-      );
-    }).toList(growable: false);
+      if (bytesBase64.isEmpty) {
+        continue;
+      }
+      try {
+        attachments.add(
+          ChatImageAttachment(
+            bytes: Uint8List.fromList(base64Decode(bytesBase64)),
+            name: item['name']?.toString() ?? 'image.png',
+            mimeType: item['mimeType']?.toString() ?? 'image/png',
+          ),
+        );
+      } catch (_) {
+        continue;
+      }
+    }
+
+    return attachments;
   }
 
   int _toInt(Object? value) {

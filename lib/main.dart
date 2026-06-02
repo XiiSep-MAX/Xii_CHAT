@@ -315,12 +315,16 @@ class _SplashIntroGate extends StatefulWidget {
 }
 
 class _SplashIntroGateState extends State<_SplashIntroGate>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   static const Duration _minimumIntroDuration = Duration(milliseconds: 3600);
+  static const Duration _maximumIntroWait = Duration(seconds: 12);
 
   late final AnimationController _controller;
+  late final AnimationController _ambientController;
   bool _minimumDurationElapsed = false;
   bool _initializationComplete = false;
+  bool _forcedIntroDismiss = false;
+  bool _loadingExtendedBeyondMinimum = false;
   bool _showIntro = true;
 
   @override
@@ -330,8 +334,21 @@ class _SplashIntroGateState extends State<_SplashIntroGate>
       vsync: this,
       duration: _minimumIntroDuration,
     )..forward();
+    _ambientController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat();
     Future<void>.delayed(_minimumIntroDuration, () {
       if (!mounted) return;
+      _minimumDurationElapsed = true;
+      _loadingExtendedBeyondMinimum = !_initializationComplete;
+      _tryDismissIntro();
+    });
+    Future<void>.delayed(_maximumIntroWait, () {
+      if (!mounted || !_showIntro || _initializationComplete) {
+        return;
+      }
+      _forcedIntroDismiss = true;
       _minimumDurationElapsed = true;
       _tryDismissIntro();
     });
@@ -339,6 +356,7 @@ class _SplashIntroGateState extends State<_SplashIntroGate>
 
   @override
   void dispose() {
+    _ambientController.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -354,7 +372,8 @@ class _SplashIntroGateState extends State<_SplashIntroGate>
 
   void _tryDismissIntro() {
     if (!mounted || !_showIntro) return;
-    if (!_minimumDurationElapsed || !_initializationComplete) {
+    if (!_minimumDurationElapsed ||
+        (!_initializationComplete && !_forcedIntroDismiss)) {
       return;
     }
     setState(() {
@@ -378,8 +397,10 @@ class _SplashIntroGateState extends State<_SplashIntroGate>
             curve: Curves.easeInOutCubic,
             opacity: _showIntro ? 1 : 0,
             child: _SplashIntroScene(
-              controller: _controller,
+              timelineController: _controller,
+              ambientController: _ambientController,
               initializationComplete: _initializationComplete,
+              loadingExtendedBeyondMinimum: _loadingExtendedBeyondMinimum,
             ),
           ),
         ),
@@ -389,33 +410,43 @@ class _SplashIntroGateState extends State<_SplashIntroGate>
 }
 
 class _SplashIntroScene extends StatelessWidget {
-  final AnimationController controller;
+  final AnimationController timelineController;
+  final AnimationController ambientController;
   final bool initializationComplete;
+  final bool loadingExtendedBeyondMinimum;
 
   const _SplashIntroScene({
-    required this.controller,
+    required this.timelineController,
+    required this.ambientController,
     required this.initializationComplete,
+    required this.loadingExtendedBeyondMinimum,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: AnimatedBuilder(
-        animation: controller,
+        animation: Listenable.merge([timelineController, ambientController]),
         builder: (context, child) {
-          final t = Curves.easeInOutCubic.transform(controller.value);
+          final effectiveTimelineValue = loadingExtendedBeyondMinimum
+              ? math.min(timelineController.value, 0.78)
+              : timelineController.value;
           final entrance = Curves.easeOutExpo.transform(
-            (controller.value / 0.36).clamp(0.0, 1.0),
+            (effectiveTimelineValue / 0.36).clamp(0.0, 1.0),
           );
           final settle = Curves.easeInOut.transform(
-            ((controller.value - 0.18) / 0.5).clamp(0.0, 1.0),
+            ((effectiveTimelineValue - 0.18) / 0.5).clamp(0.0, 1.0),
           );
-          final scan = Curves.easeInOutSine.transform(
-            ((controller.value - 0.12) / 0.76).clamp(0.0, 1.0),
-          );
-          final outro = Curves.easeInCubic.transform(
-            ((controller.value - 0.78) / 0.22).clamp(0.0, 1.0),
-          );
+          final scan = loadingExtendedBeyondMinimum
+              ? ambientController.value
+              : Curves.easeInOutSine.transform(
+                  ((effectiveTimelineValue - 0.12) / 0.76).clamp(0.0, 1.0),
+                );
+          final outro = loadingExtendedBeyondMinimum
+              ? 0.0
+              : Curves.easeInCubic.transform(
+                  ((effectiveTimelineValue - 0.78) / 0.22).clamp(0.0, 1.0),
+                );
 
           return DecoratedBox(
             decoration: const BoxDecoration(
@@ -434,92 +465,103 @@ class _SplashIntroScene extends StatelessWidget {
             child: Stack(
               children: [
                 Positioned.fill(
-                  child: CustomPaint(
-                    painter: _IntroBackgroundPainter(
-                      progress: t,
-                      scanProgress: scan,
+                  child: RepaintBoundary(
+                    child: CustomPaint(
+                      painter: _IntroBackgroundPainter(
+                        scanProgress: scan,
+                      ),
                     ),
                   ),
                 ),
                 Positioned(
                   top: 64,
                   left: 28,
-                  child: Opacity(
-                    opacity: 0.55 + (0.45 * entrance),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'XII RAW GRAPH',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.96),
-                            fontSize: 14,
-                            letterSpacing: 4.8,
-                            fontWeight: FontWeight.w800,
+                  child: RepaintBoundary(
+                    child: Opacity(
+                      opacity: 0.55 + (0.45 * entrance),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'XII RAW GRAPH',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.96),
+                              fontSize: 14,
+                              letterSpacing: 4.8,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'HOLOGRAPHIC CREATIVE CONSOLE',
-                          style: TextStyle(
-                            color: const Color(0xFF7DD3FC)
-                                .withValues(alpha: 0.72),
-                            fontSize: 10.5,
-                            letterSpacing: 2.2,
-                            fontWeight: FontWeight.w700,
+                          const SizedBox(height: 8),
+                          Text(
+                            'HOLOGRAPHIC CREATIVE CONSOLE',
+                            style: TextStyle(
+                              color: const Color(0xFF7DD3FC)
+                                  .withValues(alpha: 0.72),
+                              fontSize: 10.5,
+                              letterSpacing: 2.2,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
                 Positioned(
                   top: 62,
                   right: 28,
-                  child: Opacity(
-                    opacity: 0.42 + (0.58 * entrance),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.04),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: const Color(0xFF67E8F9).withValues(alpha: 0.22),
+                  child: RepaintBoundary(
+                    child: Opacity(
+                      opacity: 0.42 + (0.58 * entrance),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF22D3EE)
-                                .withValues(alpha: 0.10),
-                            blurRadius: 18,
-                            spreadRadius: -6,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: const Color(0xFF67E8F9)
+                                .withValues(alpha: 0.22),
                           ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'SYSTEM READY',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.52),
-                              fontSize: 10,
-                              letterSpacing: 1.8,
-                              fontWeight: FontWeight.w700,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF22D3EE)
+                                  .withValues(alpha: 0.10),
+                              blurRadius: 18,
+                              spreadRadius: -6,
                             ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            initializationComplete ? '100%' : '${(controller.value * 100).round()}%',
-                            style: const TextStyle(
-                              color: Color(0xFFBAE6FD),
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'SYSTEM READY',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.52),
+                                fontSize: 10,
+                                letterSpacing: 1.8,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 6),
+                            Text(
+                              initializationComplete
+                                  ? '100%'
+                                  : '${(math.max(
+                                        effectiveTimelineValue,
+                                        timelineController.value.clamp(0.0, 1.0),
+                                      ) * 100).round()}%',
+                              style: const TextStyle(
+                                color: Color(0xFFBAE6FD),
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -549,10 +591,12 @@ class _SplashIntroScene extends StatelessWidget {
                                       SizedBox(
                                         width: stageWidth,
                                         height: stageHeight,
-                                        child: _IntroStage(
-                                          entrance: entrance,
-                                          settle: settle,
-                                          scan: scan,
+                                        child: RepaintBoundary(
+                                          child: _IntroStage(
+                                            entrance: entrance,
+                                            settle: settle,
+                                            scan: scan,
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(height: 38),
@@ -645,7 +689,7 @@ class _SplashIntroScene extends StatelessWidget {
                                           child: LinearProgressIndicator(
                                             value: initializationComplete
                                                 ? 1
-                                                : controller.value,
+                                                : timelineController.value,
                                             minHeight: 4,
                                             backgroundColor: Colors.white
                                                 .withValues(alpha: 0.10),
@@ -853,38 +897,40 @@ class _IntroPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Transform.translate(
-      offset: offset,
-      child: Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: borderColor),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              colorA.withValues(alpha: 0.94),
-              colorB.withValues(alpha: 0.82),
+    return RepaintBoundary(
+      child: Transform.translate(
+        offset: offset,
+        child: Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: borderColor),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                colorA.withValues(alpha: 0.94),
+                colorB.withValues(alpha: 0.82),
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: shadowColor,
+                blurRadius: 34,
+                spreadRadius: -10,
+                offset: const Offset(0, 22),
+              ),
             ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: shadowColor,
-              blurRadius: 34,
-              spreadRadius: -10,
-              offset: const Offset(0, 22),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(27),
+            child: Stack(
+              children: [
+                Positioned.fill(child: child),
+                const Positioned.fill(child: _IntroHudCorners()),
+              ],
             ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(27),
-          child: Stack(
-            children: [
-              Positioned.fill(child: child),
-              const Positioned.fill(child: _IntroHudCorners()),
-            ],
           ),
         ),
       ),
@@ -897,9 +943,11 @@ class _IntroPanelGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _IntroPanelGridPainter(),
-      child: Container(),
+    return RepaintBoundary(
+      child: CustomPaint(
+        painter: _IntroPanelGridPainter(),
+        child: const SizedBox.expand(),
+      ),
     );
   }
 }
@@ -1003,8 +1051,10 @@ class _IntroCenterPanel extends StatelessWidget {
               return Column(
                 children: [
                   Expanded(
-                    child: CustomPaint(
-                      painter: _IntroWavePainter(scan: scan),
+                    child: RepaintBoundary(
+                      child: CustomPaint(
+                        painter: _IntroWavePainter(scan: scan),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1271,8 +1321,10 @@ class _IntroHudCorners extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
-      child: CustomPaint(
-        painter: _IntroHudCornersPainter(),
+      child: RepaintBoundary(
+        child: CustomPaint(
+          painter: _IntroHudCornersPainter(),
+        ),
       ),
     );
   }
@@ -1312,11 +1364,9 @@ class _StatusDot extends StatelessWidget {
 }
 
 class _IntroBackgroundPainter extends CustomPainter {
-  final double progress;
   final double scanProgress;
 
   const _IntroBackgroundPainter({
-    required this.progress,
     required this.scanProgress,
   });
 
@@ -1412,8 +1462,7 @@ class _IntroBackgroundPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _IntroBackgroundPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.scanProgress != scanProgress;
+    return oldDelegate.scanProgress != scanProgress;
   }
 }
 
@@ -3000,9 +3049,6 @@ class _ChatScreenState extends State<ChatScreen>
     _controller
       ..text = selectedPrompt
       ..selection = TextSelection.collapsed(offset: selectedPrompt.length);
-    if (mounted) {
-      setState(() {});
-    }
   }
 
   Future<void> _pickImage() async {
@@ -7573,7 +7619,14 @@ class _GeminiGenerationPlaceholder extends StatefulWidget {
 class _GeminiGenerationPlaceholderState
     extends State<_GeminiGenerationPlaceholder>
     with SingleTickerProviderStateMixin {
+  static const TextStyle _stubTextStyle = TextStyle(
+    fontSize: 13.5,
+    fontWeight: FontWeight.w600,
+  );
+
   late final AnimationController _controller;
+  late final double _detailStubWidth;
+  late final double _referenceStubWidth;
 
   @override
   void initState() {
@@ -7582,6 +7635,8 @@ class _GeminiGenerationPlaceholderState
       vsync: this,
       duration: const Duration(milliseconds: 1600),
     )..repeat();
+    _detailStubWidth = _measureStubWidth('图像细节渲染中');
+    _referenceStubWidth = _measureStubWidth('保持参考图主体特征');
   }
 
   @override
@@ -7651,19 +7706,23 @@ class _GeminiGenerationPlaceholderState
                     ],
                   ),
                   const SizedBox(height: 14),
-                  _buildShimmerTextStub(
-                    context,
-                    '图像细节渲染中',
-                    delay: 0.0,
+                  RepaintBoundary(
+                    child: _buildShimmerTextStub(
+                      _detailStubWidth,
+                      delay: 0.0,
+                    ),
                   ),
                   const SizedBox(height: 10),
-                  _buildShimmerTextStub(
-                    context,
-                    '保持参考图主体特征',
-                    delay: 0.18,
+                  RepaintBoundary(
+                    child: _buildShimmerTextStub(
+                      _referenceStubWidth,
+                      delay: 0.18,
+                    ),
                   ),
                   const SizedBox(height: 18),
-                  _buildImagePlaceholder(imageAspectRatio),
+                  RepaintBoundary(
+                    child: _buildImagePlaceholder(imageAspectRatio),
+                  ),
                 ],
               ),
             ),
@@ -7696,8 +7755,7 @@ class _GeminiGenerationPlaceholderState
   }
 
   Widget _buildShimmerTextStub(
-    BuildContext context,
-    String text, {
+    double stubWidth, {
     required double delay,
   }) {
     return AnimatedBuilder(
@@ -7706,16 +7764,6 @@ class _GeminiGenerationPlaceholderState
         final base = _AppChromePalette.panelElevated.withValues(alpha: 0.92);
         final glow = const Color(0xFF7DD3FC).withValues(alpha: 0.88);
         final shift = ((_controller.value + delay) % 1.0);
-        final textStyle = TextStyle(
-          fontSize: 13.5,
-          fontWeight: FontWeight.w600,
-        );
-        final painter = TextPainter(
-          text: TextSpan(text: text, style: textStyle),
-          textDirection: Directionality.of(context),
-          maxLines: 1,
-        )..layout();
-        final stubWidth = painter.width + 18;
         return FractionallySizedBox(
           alignment: Alignment.centerLeft,
           child: Container(
@@ -7738,6 +7786,16 @@ class _GeminiGenerationPlaceholderState
         );
       },
     );
+  }
+
+  double _measureStubWidth(String text) {
+    final painter = TextPainter(
+      text: const TextSpan(style: _stubTextStyle),
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+    )..text = TextSpan(text: text, style: _stubTextStyle)
+      ..layout();
+    return painter.width + 18;
   }
 
   double _resolvePlaceholderAspectRatio(String value) {
