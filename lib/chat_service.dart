@@ -15,12 +15,14 @@ class ChatResponse {
   final List<GeneratedImageAsset> generatedImages;
   final String? taskId;
   final String? taskStatus;
+  final String? clientRequestId;
 
   ChatResponse({
     required this.text,
     this.generatedImages = const [],
     this.taskId,
     this.taskStatus,
+    this.clientRequestId,
   });
 }
 
@@ -78,6 +80,7 @@ class OpenAIChatService {
   Future<ChatResponse> sendMessage({
     required String prompt,
     required ImageGenerationOptions options,
+    required String clientRequestId,
     List<ChatImageAttachment> imageAttachments = const [],
   }) async {
     final normalizedOptions = options.normalized();
@@ -94,6 +97,7 @@ class OpenAIChatService {
         prompt: prompt,
         composedPrompt: composedPrompt,
         options: normalizedOptions,
+        clientRequestId: clientRequestId,
         imageAttachments: imageAttachments,
       );
     }
@@ -259,6 +263,7 @@ class OpenAIChatService {
     required String prompt,
     required String composedPrompt,
     required ImageGenerationOptions options,
+    required String clientRequestId,
     required List<ChatImageAttachment> imageAttachments,
   }) async {
     final licenseStatus = await LicenseService.instance.initialize();
@@ -347,7 +352,8 @@ class OpenAIChatService {
   }
 
   Future<ChatResponse> fetchWorkerTask({
-    required String taskId,
+    String? taskId,
+    String? clientRequestId,
     required ImageGenerationOptions options,
     bool isEditRequest = false,
   }) async {
@@ -355,11 +361,17 @@ class OpenAIChatService {
     if (workerBaseUrl == null || workerBaseUrl.isEmpty) {
       throw Exception('当前未配置任务查询服务。');
     }
+    final resolvedTaskId = taskId?.trim() ?? '';
+    final resolvedClientRequestId = clientRequestId?.trim() ?? '';
+    if (resolvedTaskId.isEmpty && resolvedClientRequestId.isEmpty) {
+      throw Exception('缺少任务恢复标识。');
+    }
 
     final licenseStatus = await LicenseService.instance.initialize();
-    final uri = Uri.parse(
-      '$workerBaseUrl/v1/chat/tasks/$taskId',
-    ).replace(
+    final path = resolvedTaskId.isNotEmpty
+        ? '$workerBaseUrl/v1/chat/tasks/$resolvedTaskId'
+        : '$workerBaseUrl/v1/chat/tasks/by-client/$resolvedClientRequestId';
+    final uri = Uri.parse(path).replace(
       queryParameters: {
         'token': licenseStatus.licenseToken ?? '',
         'installId': licenseStatus.installId,
@@ -441,6 +453,7 @@ class OpenAIChatService {
     required bool isEditRequest,
     String? taskId,
     String? taskStatus,
+    String? clientRequestId,
   }) {
     final generatedImages = <GeneratedImageAsset>[];
     final textParts = <String>[];
@@ -555,6 +568,7 @@ class OpenAIChatService {
         generatedImages: generatedImages,
         taskId: taskId,
         taskStatus: taskStatus,
+        clientRequestId: clientRequestId,
       );
     }
 
@@ -563,6 +577,7 @@ class OpenAIChatService {
         text: responseText,
         taskId: taskId,
         taskStatus: taskStatus,
+        clientRequestId: clientRequestId,
       );
     }
 
@@ -576,6 +591,7 @@ class OpenAIChatService {
   }) {
     final taskId = body['taskId']?.toString();
     final taskStatus = body['status']?.toString();
+    final clientRequestId = body['clientRequestId']?.toString();
     final content = body['content'];
     if (taskStatus == 'completed') {
       return _parseResponseContent(
@@ -584,6 +600,7 @@ class OpenAIChatService {
         isEditRequest: isEditRequest,
         taskId: taskId,
         taskStatus: taskStatus,
+        clientRequestId: clientRequestId,
       );
     }
 
@@ -593,6 +610,7 @@ class OpenAIChatService {
           : '任务已提交，正在生成中。',
       taskId: taskId,
       taskStatus: taskStatus,
+      clientRequestId: clientRequestId,
     );
   }
 

@@ -148,6 +148,7 @@ class ChatMessage {
   final ImageGenerationOptions? generationOptions;
   final MessageDeliveryState deliveryState;
   final String? remoteTaskId;
+  final String? clientRequestId;
 
   ChatMessage({
     this.id,
@@ -158,6 +159,7 @@ class ChatMessage {
     this.generationOptions,
     this.deliveryState = MessageDeliveryState.completed,
     this.remoteTaskId,
+    this.clientRequestId,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -167,12 +169,11 @@ class ChatMessage {
   bool get isFailed => deliveryState == MessageDeliveryState.failed;
   bool get hasResolvableRemoteTask =>
       role == Role.bot &&
-      remoteTaskId != null &&
-      remoteTaskId!.trim().isNotEmpty &&
       generatedImages.isEmpty &&
-      !isFailed;
-  bool get shouldShowGenerationPlaceholder =>
-      (hasResolvableRemoteTask && text.trim() == '正在生成图片...') || isPending;
+      ((remoteTaskId != null && remoteTaskId!.trim().isNotEmpty) ||
+          (clientRequestId != null && clientRequestId!.trim().isNotEmpty)) &&
+      (isPending || isInterrupted);
+  bool get shouldShowGenerationPlaceholder => isPending;
 }
 
 class ChatSessionInfo {
@@ -216,6 +217,16 @@ class GeneratedImageHistoryEntry {
     required this.size,
     required this.quality,
     required this.image,
+  });
+}
+
+class RecoverableTaskMessage {
+  final int sessionId;
+  final ChatMessage message;
+
+  const RecoverableTaskMessage({
+    required this.sessionId,
+    required this.message,
   });
 }
 

@@ -1,11 +1,11 @@
 {
-  "version": "1.2.14",
-  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.14.zip",
+  "version": "1.2.15",
+  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.15.zip",
   "mirrorUrls": [
-    "https://github.com/XiiSep-MAX/Xii_CHAT/releases/download/v1.2.14/Xii_Raw_Graph_Trial_v1.2.14.zip"
+    "https://github.com/XiiSep-MAX/Xii_CHAT/releases/download/v1.2.15/Xii_Raw_Graph_Trial_v1.2.15.zip"
   ],
-  "sha256": "7d47f6056aa971f9e13db65bb7f56e3000bccc134653216dc38497c21fc93372",
-  "releaseNotes": "🛠️ 1.2.14 生成链路修复版\n\n本次更新包含：\n- 修复相同提示词再次生成时可能直接返回旧任务结果的问题，现在每次点击生成都会创建新的生图任务\n- 修复存在可恢复任务时仍然可以继续点击生成的问题，生成中的会话现在会严格锁定重复生成\n- 保留关闭 App 后重新打开继续恢复未完成生图任务的能力",
+  "sha256": "6a28baa95ea219f332a7c4ec52ba64594933ebfc991543ead8e003e64da89643",
+  "releaseNotes": "⚡ 1.2.15 会话切换与输入区动效优化\n\n本次更新包含：\n- 输入区外围边框新增更明显的单向扫光特效，光线不再来回往返，整体观感更统一\n- 优化会话切换流程，切换时不再额外重载整份生图历史，并取消切换后的自动滚动动画，降低卡顿感\n- 修复新增边框特效后可能触发的绘制异常，避免界面切换或重绘时出现运行时崩溃\n- 延续未完成生图任务恢复、重复生成锁定与参考图生成链路修复后的稳定行为",
   "isForced": false,
-  "signature": "fEdaAUE5mtOqYx3sVUufxCav6pXTyYyvFOhrp9l05weRFJHzBFDjGG9tPfJHyHPRczAD7OXS8pYQnMOwHTcCAw=="
+  "signature": "2z0z5SOkGwLU6SnTD79LNN9RYl30A7+qeSVEvqg4xCBD+EvPIFPTUAfLVbSKQoawlJYaFqH3EzKarXETmN2ABg=="
 }

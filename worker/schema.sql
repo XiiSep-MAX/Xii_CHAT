@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS generation_tasks (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   task_id TEXT NOT NULL UNIQUE,
   idempotency_key TEXT NOT NULL UNIQUE,
+  client_request_id TEXT,
   license_code_id INTEGER NOT NULL,
   install_id_hash TEXT NOT NULL,
   task_type TEXT NOT NULL DEFAULT 'generate',
@@ -114,6 +115,9 @@ CREATE TABLE IF NOT EXISTS generation_tasks (
 
 CREATE INDEX IF NOT EXISTS idx_generation_tasks_lookup
 ON generation_tasks(license_code_id, install_id_hash, created_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_generation_tasks_client_request
+ON generation_tasks(client_request_id);
 
 CREATE INDEX IF NOT EXISTS idx_generation_tasks_status
 ON generation_tasks(status, updated_at DESC);

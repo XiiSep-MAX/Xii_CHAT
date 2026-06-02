@@ -12,7 +12,7 @@ class LocalStorageService {
   static final LocalStorageService instance = LocalStorageService._();
 
   static const _databaseName = 'xii_chat_local.db';
-  static const _databaseVersion = 4;
+  static const _databaseVersion = 5;
   static const _legacySwitchLogCleanupStateKey =
       'legacy_session_switch_logs_cleaned_v1';
 
@@ -74,6 +74,7 @@ class LocalStorageService {
         created_at TEXT NOT NULL,
         delivery_state TEXT NOT NULL DEFAULT 'completed',
         remote_task_id TEXT,
+        client_request_id TEXT,
         generation_options_json TEXT,
         local_images_json TEXT,
         FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
@@ -147,6 +148,12 @@ class LocalStorageService {
         ADD COLUMN remote_task_id TEXT
       ''');
     }
+    if (oldVersion < 5) {
+      await db.execute('''
+        ALTER TABLE messages
+        ADD COLUMN client_request_id TEXT
+      ''');
+    }
   }
 
   Future<void> _ensureSchemaCompatibility() async {
@@ -170,6 +177,7 @@ class LocalStorageService {
           created_at TEXT NOT NULL,
           delivery_state TEXT NOT NULL DEFAULT 'completed',
           remote_task_id TEXT,
+          client_request_id TEXT,
           generation_options_json TEXT,
           local_images_json TEXT,
           FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
@@ -217,6 +225,12 @@ class LocalStorageService {
         txn,
         table: 'messages',
         column: 'remote_task_id',
+        definition: 'TEXT',
+      );
+      await _ensureColumnExists(
+        txn,
+        table: 'messages',
+        column: 'client_request_id',
         definition: 'TEXT',
       );
       await _ensureColumnExists(
@@ -548,11 +562,74 @@ class LocalStorageService {
           (row['delivery_state'] as String?) ?? 'completed',
         ),
         remoteTaskId: row['remote_task_id'] as String?,
+        clientRequestId: row['client_request_id'] as String?,
         generationOptions: _decodeGenerationOptions(
           row['generation_options_json'] as String?,
         ),
         localImages: _decodeLocalImages(row['local_images_json'] as String?),
         generatedImages: imagesByMessageId[id] ?? const <GeneratedImageAsset>[],
+      );
+    }).toList(growable: false);
+  }
+
+  Future<List<RecoverableTaskMessage>> loadRecoverableTaskMessages() async {
+    final rows = await _db.rawQuery('''
+      SELECT
+        m.id,
+        m.session_id,
+        m.role,
+        m.text,
+        m.created_at,
+        m.delivery_state,
+        m.remote_task_id,
+        m.client_request_id,
+        m.generation_options_json,
+        m.local_images_json
+      FROM messages m
+      LEFT JOIN generated_images gi ON gi.message_id = m.id
+      WHERE
+        m.role = ? AND
+        m.delivery_state IN (?, ?) AND
+        (m.remote_task_id IS NOT NULL OR m.client_request_id IS NOT NULL)
+      GROUP BY
+        m.id,
+        m.session_id,
+        m.role,
+        m.text,
+        m.created_at,
+        m.delivery_state,
+        m.remote_task_id,
+        m.client_request_id,
+        m.generation_options_json,
+        m.local_images_json
+      HAVING COUNT(gi.id) = 0
+      ORDER BY m.created_at ASC, m.id ASC
+    ''', [
+      Role.bot.name,
+      MessageDeliveryState.pending.name,
+      MessageDeliveryState.interrupted.name,
+    ]);
+
+    return rows.map((row) {
+      final message = ChatMessage(
+        id: row['id'] as int,
+        text: (row['text'] as String?) ?? '',
+        role: _parseRole((row['role'] as String?) ?? 'bot'),
+        createdAt: DateTime.parse(row['created_at'] as String),
+        deliveryState: _parseDeliveryState(
+          (row['delivery_state'] as String?) ?? 'completed',
+        ),
+        remoteTaskId: row['remote_task_id'] as String?,
+        clientRequestId: row['client_request_id'] as String?,
+        generationOptions: _decodeGenerationOptions(
+          row['generation_options_json'] as String?,
+        ),
+        localImages: _decodeLocalImages(row['local_images_json'] as String?),
+        generatedImages: const <GeneratedImageAsset>[],
+      );
+      return RecoverableTaskMessage(
+        sessionId: row['session_id'] as int,
+        message: message,
       );
     }).toList(growable: false);
   }
@@ -571,6 +648,7 @@ class LocalStorageService {
         'created_at': createdAt,
         'delivery_state': message.deliveryState.name,
         'remote_task_id': message.remoteTaskId,
+        'client_request_id': message.clientRequestId,
         'generation_options_json':
             _encodeGenerationOptions(message.generationOptions),
         'local_images_json': _encodeLocalImages(message.localImages),
@@ -609,6 +687,9 @@ class LocalStorageService {
       generatedImages: message.generatedImages,
       localImages: message.localImages,
       generationOptions: message.generationOptions,
+      deliveryState: message.deliveryState,
+      remoteTaskId: message.remoteTaskId,
+      clientRequestId: message.clientRequestId,
     );
   }
 
@@ -730,6 +811,7 @@ class LocalStorageService {
           'created_at': updatedAt,
           'delivery_state': message.deliveryState.name,
           'remote_task_id': message.remoteTaskId,
+          'client_request_id': message.clientRequestId,
           'generation_options_json':
               _encodeGenerationOptions(message.generationOptions),
           'local_images_json': _encodeLocalImages(message.localImages),
@@ -785,6 +867,7 @@ class LocalStorageService {
       generationOptions: message.generationOptions,
       deliveryState: message.deliveryState,
       remoteTaskId: message.remoteTaskId,
+      clientRequestId: message.clientRequestId,
     );
   }
 
