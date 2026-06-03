@@ -11,15 +11,6 @@ database_id = "f57b3eb3-7db9-4e2a-b5ba-24c622543cd9"
 UPSTREAM_BASE_URL = "https://www.packyapi.com/v1/chat/completions"
 UPSTREAM_MODEL = "gpt-image-2"
 
-[[queues.producers]]
-binding = "GENERATION_QUEUE"
-queue = "xii-generation-tasks"
-
-[[queues.consumers]]
-queue = "xii-generation-tasks"
-max_batch_size = 5
-max_batch_timeout = 5
-
 [[routes]]
 pattern = "api.xiimax.top"
 custom_domain = true

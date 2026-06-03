@@ -13,16 +13,10 @@ String get openAIApiKey => EnvConfig.getRequired('OPENAI_API_KEY');
 class ChatResponse {
   final String text;
   final List<GeneratedImageAsset> generatedImages;
-  final String? taskId;
-  final String? taskStatus;
-  final String? clientRequestId;
 
   ChatResponse({
     required this.text,
     this.generatedImages = const [],
-    this.taskId,
-    this.taskStatus,
-    this.clientRequestId,
   });
 }
 
@@ -80,7 +74,6 @@ class OpenAIChatService {
   Future<ChatResponse> sendMessage({
     required String prompt,
     required ImageGenerationOptions options,
-    required String clientRequestId,
     List<ChatImageAttachment> imageAttachments = const [],
   }) async {
     final normalizedOptions = options.normalized();
@@ -97,7 +90,6 @@ class OpenAIChatService {
         prompt: prompt,
         composedPrompt: composedPrompt,
         options: normalizedOptions,
-        clientRequestId: clientRequestId,
         imageAttachments: imageAttachments,
       );
     }
@@ -263,7 +255,6 @@ class OpenAIChatService {
     required String prompt,
     required String composedPrompt,
     required ImageGenerationOptions options,
-    required String clientRequestId,
     required List<ChatImageAttachment> imageAttachments,
   }) async {
     final licenseStatus = await LicenseService.instance.initialize();
@@ -295,9 +286,12 @@ class OpenAIChatService {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception(_extractErrorMessage(response, body));
     }
+    _throwIfLegacyQueuedWorkerResponse(body);
 
-    return _parseWorkerTaskResponse(
-      body,
+    final content = body['content'] ?? body['data'] ?? body;
+    _throwIfLegacyQueuedWorkerContent(content);
+    return _parseResponseContent(
+      content,
       options: options,
       isEditRequest: imageAttachments.isNotEmpty,
     );
@@ -342,52 +336,14 @@ class OpenAIChatService {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception(_extractErrorMessage(response, body));
     }
+    _throwIfLegacyQueuedWorkerResponse(body);
 
     final content = body['content'] ?? body['data'] ?? body;
+    _throwIfLegacyQueuedWorkerContent(content);
     return _parseResponseContent(
       content,
       options: options,
       isEditRequest: true,
-    );
-  }
-
-  Future<ChatResponse> fetchWorkerTask({
-    String? taskId,
-    String? clientRequestId,
-    required ImageGenerationOptions options,
-    bool isEditRequest = false,
-  }) async {
-    final workerBaseUrl = _workerBaseUrl;
-    if (workerBaseUrl == null || workerBaseUrl.isEmpty) {
-      throw Exception('当前未配置任务查询服务。');
-    }
-    final resolvedTaskId = taskId?.trim() ?? '';
-    final resolvedClientRequestId = clientRequestId?.trim() ?? '';
-    if (resolvedTaskId.isEmpty && resolvedClientRequestId.isEmpty) {
-      throw Exception('缺少任务恢复标识。');
-    }
-
-    final licenseStatus = await LicenseService.instance.initialize();
-    final path = resolvedTaskId.isNotEmpty
-        ? '$workerBaseUrl/v1/chat/tasks/$resolvedTaskId'
-        : '$workerBaseUrl/v1/chat/tasks/by-client/$resolvedClientRequestId';
-    final uri = Uri.parse(path).replace(
-      queryParameters: {
-        'token': licenseStatus.licenseToken ?? '',
-        'installId': licenseStatus.installId,
-      },
-    );
-
-    final response = await http.get(uri);
-    final body = _decodeJsonFromResponse(response);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(_extractErrorMessage(response, body));
-    }
-
-    return _parseWorkerTaskResponse(
-      body,
-      options: options,
-      isEditRequest: isEditRequest,
     );
   }
 
@@ -447,13 +403,46 @@ class OpenAIChatService {
     return null;
   }
 
+  void _throwIfLegacyQueuedWorkerResponse(Map<String, dynamic> body) {
+    final status = (body['taskStatus'] ?? body['status'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    final hasLegacyTaskMarkers =
+        body['taskId'] != null ||
+        body['clientRequestId'] != null ||
+        body['taskStatus'] != null;
+    if (hasLegacyTaskMarkers && status.isNotEmpty && status != 'completed') {
+      throw Exception(
+        '当前线上 Worker 仍是旧版任务队列逻辑，尚未返回最终图片结果。请先重新部署已回退到 v1.2.12 的 Worker。',
+      );
+    }
+  }
+
+  void _throwIfLegacyQueuedWorkerContent(dynamic content) {
+    if (content is! Map) {
+      return;
+    }
+
+    final status = (content['taskStatus'] ?? content['status'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    final hasLegacyTaskMarkers =
+        content['taskId'] != null ||
+        content['clientRequestId'] != null ||
+        content['taskStatus'] != null;
+    if (hasLegacyTaskMarkers && status.isNotEmpty && status != 'completed') {
+      throw Exception(
+        '当前线上 Worker 仍是旧版任务队列逻辑，尚未返回最终图片结果。请先重新部署已回退到 v1.2.12 的 Worker。',
+      );
+    }
+  }
+
   ChatResponse _parseResponseContent(
     dynamic content, {
     required ImageGenerationOptions options,
     required bool isEditRequest,
-    String? taskId,
-    String? taskStatus,
-    String? clientRequestId,
   }) {
     final generatedImages = <GeneratedImageAsset>[];
     final textParts = <String>[];
@@ -566,52 +555,14 @@ class OpenAIChatService {
       return ChatResponse(
         text: responseText.isEmpty ? fallbackText : responseText,
         generatedImages: generatedImages,
-        taskId: taskId,
-        taskStatus: taskStatus,
-        clientRequestId: clientRequestId,
       );
     }
 
     if (responseText.isNotEmpty) {
-      return ChatResponse(
-        text: responseText,
-        taskId: taskId,
-        taskStatus: taskStatus,
-        clientRequestId: clientRequestId,
-      );
+      return ChatResponse(text: responseText);
     }
 
     throw Exception('接口已返回成功，但没有解析到图片结果。');
-  }
-
-  ChatResponse _parseWorkerTaskResponse(
-    Map<String, dynamic> body, {
-    required ImageGenerationOptions options,
-    required bool isEditRequest,
-  }) {
-    final taskId = body['taskId']?.toString();
-    final taskStatus = body['status']?.toString();
-    final clientRequestId = body['clientRequestId']?.toString();
-    final content = body['content'];
-    if (taskStatus == 'completed') {
-      return _parseResponseContent(
-        content,
-        options: options,
-        isEditRequest: isEditRequest,
-        taskId: taskId,
-        taskStatus: taskStatus,
-        clientRequestId: clientRequestId,
-      );
-    }
-
-    return ChatResponse(
-      text: taskStatus == 'failed'
-          ? (body['error']?.toString() ?? '图片生成失败。')
-          : '任务已提交，正在生成中。',
-      taskId: taskId,
-      taskStatus: taskStatus,
-      clientRequestId: clientRequestId,
-    );
   }
 
   String _extractErrorMessage(

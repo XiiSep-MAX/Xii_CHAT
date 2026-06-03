@@ -1854,7 +1854,7 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen>
     with TickerProviderStateMixin {
-  static const String _appVersion = '1.2.15';
+  static const String _appVersion = '1.2.16';
   static const String _privacyAcknowledgedKey = 'privacy_acknowledged_v1';
   static const String _retainReferenceImagesKey = 'retain_reference_images_v1';
   static const String _contactWechatId = '123456';
@@ -1900,6 +1900,8 @@ class _ChatScreenState extends State<ChatScreen>
     'undress',
     'nude edit',
   ];
+  static const int _messagePageSize = 36;
+  static const int _historyPageSize = 48;
 
   final List<ChatMessage> _messages = [];
   final List<ChatSessionInfo> _sessions = [];
@@ -1918,18 +1920,15 @@ class _ChatScreenState extends State<ChatScreen>
   bool _isComposerDragTargetActive = false;
   bool _isSending = false;
   bool _isInitializing = true;
-  final Set<String> _pollingTaskIds = <String>{};
+  bool _isLoadingOlderMessages = false;
+  bool _hasMoreMessages = false;
+  bool _isLoadingMoreHistory = false;
+  bool _hasMoreHistory = false;
   late final AnimationController _composerAuraController;
   late final AnimationController _composerBorderSweepController;
+  AppLifecycleListener? _appLifecycleListener;
 
-  bool get _hasPendingGenerationInActiveSession =>
-      _messages.any(
-        (message) =>
-            message.role == Role.bot && message.isPending,
-      );
-
-  bool get _isGenerationLocked =>
-      _isSending || _hasPendingGenerationInActiveSession;
+  bool get _isGenerationLocked => _isSending;
 
   @override
   void initState() {
@@ -1942,6 +1941,10 @@ class _ChatScreenState extends State<ChatScreen>
       vsync: this,
       duration: const Duration(milliseconds: 2200),
     )..repeat();
+    _scrollController.addListener(_handleMessageScroll);
+    _appLifecycleListener = AppLifecycleListener(
+      onExitRequested: _handleExitRequested,
+    );
     widget.onInitializationChanged?.call(true);
     _initializeLocalState();
     _checkForUpdates();
@@ -1950,7 +1953,6 @@ class _ChatScreenState extends State<ChatScreen>
   Future<void> _initializeLocalState() async {
     try {
       await _storageService.initialize();
-      await _storageService.markPendingMessagesInterrupted();
       var licenseStatus = await _licenseService.initialize();
       licenseStatus = await _licenseService.refreshLicenseStatus();
 
@@ -1968,8 +1970,13 @@ class _ChatScreenState extends State<ChatScreen>
             _findSessionById(sessions, activeSession.id) ?? activeSession;
       }
 
-      final messages = await _storageService.loadMessages(activeSession.id);
-      final imageHistory = await _storageService.loadGeneratedImageHistory();
+      final messages = await _storageService.loadMessages(
+        activeSession.id,
+        limit: _messagePageSize,
+      );
+      final imageHistory = await _storageService.loadGeneratedImageHistory(
+        limit: _historyPageSize,
+      );
       final privacyAcknowledged =
           await _storageService.readAppState(_privacyAcknowledgedKey);
       final retainReferenceImagesValue =
@@ -1989,11 +1996,13 @@ class _ChatScreenState extends State<ChatScreen>
         _generatedImageHistory
           ..clear()
           ..addAll(imageHistory);
+        _hasMoreMessages = messages.length == _messagePageSize;
+        _hasMoreHistory = imageHistory.length == _historyPageSize;
+        _isLoadingOlderMessages = false;
+        _isLoadingMoreHistory = false;
         _isInitializing = false;
       });
       widget.onInitializationChanged?.call(false);
-      unawaited(_resumeRecoverableTasks());
-      _resumePendingTasksForActiveSession();
       if (privacyAcknowledged != 'true') {
         WidgetsBinding.instance.addPostFrameCallback((_) async {
           if (!mounted) return;
@@ -2683,11 +2692,56 @@ class _ChatScreenState extends State<ChatScreen>
 
   @override
   void dispose() {
+    _appLifecycleListener?.dispose();
     _composerAuraController.dispose();
     _composerBorderSweepController.dispose();
     _controller.dispose();
+    _scrollController.removeListener(_handleMessageScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<ui.AppExitResponse> _handleExitRequested() async {
+    if (!_isGenerationLocked || !mounted) {
+      return ui.AppExitResponse.exit;
+    }
+
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('注意'),
+        content: const Text(
+          '注意！若生成期间退出将可能会中断生成！！！',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('继续生成'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('仍然退出'),
+          ),
+        ],
+      ),
+    );
+
+    return shouldExit == true
+        ? ui.AppExitResponse.exit
+        : ui.AppExitResponse.cancel;
+  }
+
+  void _handleMessageScroll() {
+    if (!_scrollController.hasClients ||
+        _isLoadingOlderMessages ||
+        !_hasMoreMessages ||
+        _messages.isEmpty) {
+      return;
+    }
+    if (_scrollController.offset <= 220) {
+      unawaited(_loadOlderMessagesForActiveSession());
+    }
   }
 
   void _scrollToBottom({bool animated = true}) {
@@ -2716,263 +2770,225 @@ class _ChatScreenState extends State<ChatScreen>
     return null;
   }
 
-  void _resumePendingTasksForActiveSession() {
+  Future<void> _loadOlderMessagesForActiveSession() async {
     final activeSession = _activeSession;
-    if (activeSession == null) {
+    if (activeSession == null ||
+        _messages.isEmpty ||
+        _isLoadingOlderMessages ||
+        !_hasMoreMessages) {
       return;
     }
 
-    _resumePendingTasksForMessages(
-      sessionId: activeSession.id,
-      messages: _messages,
-    );
-  }
-
-  void _resumePendingTasksForMessages({
-    required int sessionId,
-    required List<ChatMessage> messages,
-  }) {
-    for (final message in messages) {
-      final taskId = message.remoteTaskId;
-      final clientRequestId = message.clientRequestId;
-      if (message.id != null &&
-          message.hasResolvableRemoteTask) {
-        unawaited(
-          _pollGenerationTask(
-            sessionId: sessionId,
-            messageId: message.id!,
-            taskId: taskId,
-            clientRequestId: clientRequestId,
-            options: message.generationOptions ?? _generationOptions.normalized(),
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _resumeRecoverableTasks() async {
-    final recoverableMessages =
-        await _storageService.loadRecoverableTaskMessages();
-    for (final entry in recoverableMessages) {
-      final message = entry.message;
-      if (message.id == null) {
-        continue;
-      }
-      unawaited(
-        _pollGenerationTask(
-          sessionId: entry.sessionId,
-          messageId: message.id!,
-          taskId: message.remoteTaskId,
-          clientRequestId: message.clientRequestId,
-          options: message.generationOptions ?? _generationOptions.normalized(),
-        ),
-      );
-    }
-  }
-
-  String _buildClientRequestId() {
-    final timestamp = DateTime.now().microsecondsSinceEpoch;
-    final random = math.Random().nextInt(0x7fffffff).toRadixString(16);
-    return 'req_${timestamp}_$random';
-  }
-
-  Future<void> _pollGenerationTask({
-    required int sessionId,
-    required int messageId,
-    String? taskId,
-    String? clientRequestId,
-    required ImageGenerationOptions options,
-  }) async {
-    final resolvedTaskId = taskId?.trim() ?? '';
-    final resolvedClientRequestId = clientRequestId?.trim() ?? '';
-    final pollingKey = resolvedTaskId.isNotEmpty
-        ? 'task:$resolvedTaskId'
-        : 'client:$resolvedClientRequestId';
-    if (resolvedTaskId.isEmpty && resolvedClientRequestId.isEmpty) {
+    final cursorMessage = _messages.first;
+    final cursorId = cursorMessage.id;
+    if (cursorId == null) {
       return;
     }
-    if (!_pollingTaskIds.add(pollingKey)) {
-      return;
+
+    final previousPixels =
+        _scrollController.hasClients ? _scrollController.offset : 0.0;
+    final previousExtent = _scrollController.hasClients
+        ? _scrollController.position.maxScrollExtent
+        : 0.0;
+
+    if (mounted) {
+      setState(() {
+        _isLoadingOlderMessages = true;
+      });
     }
 
     try {
-      var effectiveTaskId = resolvedTaskId;
-      for (var attempt = 0; attempt < 120; attempt++) {
-        final response = await _chatService.fetchWorkerTask(
-          taskId: effectiveTaskId.isEmpty ? null : effectiveTaskId,
-          clientRequestId: effectiveTaskId.isEmpty
-              ? resolvedClientRequestId
-              : null,
-          options: options,
-        );
-        if (effectiveTaskId.isEmpty &&
-            response.taskId != null &&
-            response.taskId!.trim().isNotEmpty) {
-          effectiveTaskId = response.taskId!.trim();
-          final existingIndex =
-              _messages.indexWhere((message) => message.id == messageId);
-          final existingMessage =
-              existingIndex >= 0 ? _messages[existingIndex] : null;
-          final refreshedPendingMessage = ChatMessage(
-            id: messageId,
-            text: existingMessage?.text ?? '正在恢复任务状态...',
-            role: Role.bot,
-            createdAt: existingMessage?.createdAt ?? DateTime.now(),
-            generatedImages:
-                existingMessage?.generatedImages ?? const <GeneratedImageAsset>[],
-            localImages:
-                existingMessage?.localImages ?? const <ChatImageAttachment>[],
-            generationOptions: options,
-            deliveryState:
-                existingMessage?.deliveryState ?? MessageDeliveryState.pending,
-            remoteTaskId: effectiveTaskId,
-            clientRequestId: resolvedClientRequestId.isEmpty
-                ? null
-                : resolvedClientRequestId,
-          );
-          final savedMessage = await _storageService.updateMessage(
-            messageId: messageId,
-            message: refreshedPendingMessage,
-          );
-          if (!mounted) return;
-          if (existingIndex >= 0 && savedMessage != null) {
-            setState(() {
-              _messages[existingIndex] = savedMessage;
-            });
-          }
-        }
-
-        if (response.taskStatus == 'completed') {
-          var licenseStatus = _licenseStatus ?? await _licenseService.initialize();
-          if (!licenseStatus.isPremium) {
-            licenseStatus = await _licenseService.consumeTrialUse();
-          } else {
-            licenseStatus = await _licenseService.refreshLicenseStatus();
-          }
-
-          final completedMessage = ChatMessage(
-            id: messageId,
-            text: response.text,
-            role: Role.bot,
-            createdAt: DateTime.now(),
-            generatedImages: response.generatedImages,
-            generationOptions: options,
-            deliveryState: MessageDeliveryState.completed,
-            remoteTaskId: effectiveTaskId.isEmpty ? null : effectiveTaskId,
-            clientRequestId: resolvedClientRequestId.isEmpty
-                ? null
-                : resolvedClientRequestId,
-          );
-          final savedMessage = await _storageService.updateMessage(
-            messageId: messageId,
-            message: completedMessage,
-          );
-          final sessions = await _storageService.loadSessions();
-          final history = await _storageService.loadGeneratedImageHistory();
-          if (!mounted) return;
-          setState(() {
-            _licenseStatus = licenseStatus;
-            final index = _messages.indexWhere((message) => message.id == messageId);
-            if (index >= 0 && savedMessage != null) {
-              _messages[index] = savedMessage;
-            }
-            _sessions
-              ..clear()
-              ..addAll(sessions);
-            _generatedImageHistory
-              ..clear()
-              ..addAll(history);
-          });
-          _scrollToBottom();
-          return;
-        }
-
-        if (response.taskStatus == 'failed') {
-          final failedMessage = ChatMessage(
-            id: messageId,
-            text: response.text,
-            role: Role.bot,
-            createdAt: DateTime.now(),
-            generationOptions: options,
-            deliveryState: MessageDeliveryState.failed,
-            remoteTaskId: effectiveTaskId.isEmpty ? null : effectiveTaskId,
-            clientRequestId: resolvedClientRequestId.isEmpty
-                ? null
-                : resolvedClientRequestId,
-          );
-          final savedMessage = await _storageService.updateMessage(
-            messageId: messageId,
-            message: failedMessage,
-          );
-          if (!mounted) return;
-          setState(() {
-            final index = _messages.indexWhere((message) => message.id == messageId);
-            if (index >= 0 && savedMessage != null) {
-              _messages[index] = savedMessage;
-            }
-          });
-          _scrollToBottom();
-          return;
-        }
-
-        await Future<void>.delayed(const Duration(seconds: 2));
+      final olderMessages = await _storageService.loadMessages(
+        activeSession.id,
+        limit: _messagePageSize,
+        beforeCreatedAt: cursorMessage.createdAt,
+        beforeMessageId: cursorId,
+      );
+      if (!mounted || _activeSession?.id != activeSession.id) {
+        return;
       }
 
-      final interruptedMessage = ChatMessage(
-        id: messageId,
-        text: '任务状态同步超时，请点击重试继续恢复。',
-        role: Role.bot,
-        createdAt: DateTime.now(),
-        generationOptions: options,
-        deliveryState: MessageDeliveryState.interrupted,
-        remoteTaskId: resolvedTaskId.isEmpty ? null : resolvedTaskId,
-        clientRequestId:
-            resolvedClientRequestId.isEmpty ? null : resolvedClientRequestId,
-      );
-      final savedMessage = await _storageService.updateMessage(
-        messageId: messageId,
-        message: interruptedMessage,
-      );
-      if (!mounted) return;
+      if (olderMessages.isEmpty) {
+        setState(() {
+          _hasMoreMessages = false;
+          _isLoadingOlderMessages = false;
+        });
+        return;
+      }
+
       setState(() {
-        final index = _messages.indexWhere((message) => message.id == messageId);
-        if (index >= 0 && savedMessage != null) {
-          _messages[index] = savedMessage;
-        }
+        _messages.insertAll(0, olderMessages);
+        _hasMoreMessages = olderMessages.length == _messagePageSize;
+        _isLoadingOlderMessages = false;
       });
-      _scrollToBottom();
-    } catch (error) {
-      final errorText = error.toString().trim();
-      final normalizedError = errorText.startsWith('Exception:')
-          ? errorText.substring('Exception:'.length).trim()
-          : errorText;
-      final interruptedMessage = ChatMessage(
-        id: messageId,
-        text: normalizedError.isEmpty
-            ? '任务状态同步中断，请稍后重试恢复。'
-            : normalizedError,
-        role: Role.bot,
-        createdAt: DateTime.now(),
-        generationOptions: options,
-        deliveryState: MessageDeliveryState.interrupted,
-        remoteTaskId: resolvedTaskId.isEmpty ? null : resolvedTaskId,
-        clientRequestId:
-            resolvedClientRequestId.isEmpty ? null : resolvedClientRequestId,
-      );
-      final savedMessage = await _storageService.updateMessage(
-        messageId: messageId,
-        message: interruptedMessage,
-      );
-      if (!mounted) return;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) {
+          return;
+        }
+        final nextExtent = _scrollController.position.maxScrollExtent;
+        final delta = nextExtent - previousExtent;
+        final targetOffset = previousPixels + math.max(0, delta);
+        _scrollController.jumpTo(
+          targetOffset.clamp(
+            0.0,
+            _scrollController.position.maxScrollExtent,
+          ),
+        );
+      });
+    } catch (_) {
+      if (!mounted || _activeSession?.id != activeSession.id) {
+        return;
+      }
       setState(() {
-        final index = _messages.indexWhere((message) => message.id == messageId);
-        if (index >= 0 && savedMessage != null) {
-          _messages[index] = savedMessage;
-        }
+        _isLoadingOlderMessages = false;
       });
-    } finally {
-      _pollingTaskIds.remove(pollingKey);
     }
+  }
+
+  Future<void> _loadMoreGeneratedImageHistory() async {
+    if (_isLoadingMoreHistory || !_hasMoreHistory) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingMoreHistory = true;
+    });
+
+    try {
+      final nextEntries = await _storageService.loadGeneratedImageHistory(
+        limit: _historyPageSize,
+        offset: _generatedImageHistory.length,
+      );
+      if (!mounted) return;
+      setState(() {
+        _generatedImageHistory.addAll(nextEntries);
+        _hasMoreHistory = nextEntries.length == _historyPageSize;
+        _isLoadingMoreHistory = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingMoreHistory = false;
+      });
+    }
+  }
+
+  Future<List<GeneratedImageAsset>> _persistGeneratedImagesLocally(
+    List<GeneratedImageAsset> images, {
+    required ImageGenerationOptions options,
+  }) async {
+    final persisted = <GeneratedImageAsset>[];
+    for (final image in images) {
+      if (image.hasBytes) {
+        persisted.add(image);
+        continue;
+      }
+
+      if (!image.hasUrl) {
+        persisted.add(image);
+        continue;
+      }
+
+      try {
+        final response = await http.get(Uri.parse(image.imageUrl!));
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          persisted.add(
+            GeneratedImageAsset(
+              bytes: response.bodyBytes,
+              fileName: image.fileName.isNotEmpty
+                  ? image.fileName
+                  : 'generated_${options.size}_${DateTime.now().millisecondsSinceEpoch}.png',
+              mimeType: image.mimeType,
+            ),
+          );
+          continue;
+        }
+      } catch (_) {
+        // Keep the remote URL as a fallback when local download fails.
+      }
+
+      persisted.add(image);
+    }
+    return persisted;
+  }
+
+  Future<void> _persistMessageImagesInBackground({
+    required int messageId,
+    required ChatMessage message,
+  }) async {
+    final sourceImages = message.generatedImages;
+    if (sourceImages.isEmpty || sourceImages.every((image) => image.hasBytes || !image.hasUrl)) {
+      return;
+    }
+
+    final persistedImages = await _persistGeneratedImagesLocally(
+      sourceImages,
+      options: message.generationOptions ?? _generationOptions.normalized(),
+    );
+    final changed = persistedImages.length == sourceImages.length &&
+        persistedImages.asMap().entries.any((entry) {
+          final before = sourceImages[entry.key];
+          final after = entry.value;
+          return before.hasUrl && after.hasBytes;
+        });
+    if (!changed) {
+      return;
+    }
+
+    final updatedMessage = ChatMessage(
+      id: message.id,
+      text: message.text,
+      role: message.role,
+      createdAt: message.createdAt,
+      generatedImages: persistedImages,
+      localImages: message.localImages,
+      generationOptions: message.generationOptions,
+      deliveryState: message.deliveryState,
+      remoteTaskId: message.remoteTaskId,
+      clientRequestId: message.clientRequestId,
+    );
+    final savedMessage = await _storageService.updateMessage(
+      messageId: messageId,
+      message: updatedMessage,
+    );
+    if (!mounted) return;
+    setState(() {
+      final index = _messages.indexWhere((entry) => entry.id == messageId);
+      if (index >= 0 && savedMessage != null) {
+        _messages[index] = savedMessage;
+      }
+    });
+    unawaited(_refreshSessionsAndHistoryInBackground());
+  }
+
+  Future<void> _refreshSessionsAndHistoryInBackground() async {
+    final sessions = await _storageService.loadSessions();
+    final historyLimit = math.max(
+      _generatedImageHistory.length,
+      _historyPageSize,
+    );
+    final history = await _storageService.loadGeneratedImageHistory(
+      limit: historyLimit,
+    );
+    if (!mounted) return;
+    final currentActiveSession = _activeSession;
+    final refreshedActiveSession = currentActiveSession == null
+        ? null
+        : _findSessionById(sessions, currentActiveSession.id) ??
+            currentActiveSession;
+    setState(() {
+      _sessions
+        ..clear()
+        ..addAll(sessions);
+      _generatedImageHistory
+        ..clear()
+        ..addAll(history);
+      _hasMoreHistory = history.length == historyLimit;
+      if (refreshedActiveSession != null) {
+        _activeSession = refreshedActiveSession;
+      }
+    });
   }
 
   Future<void> _openSession(int sessionId, {bool recordSwitch = true}) async {
@@ -2986,7 +3002,10 @@ class _ChatScreenState extends State<ChatScreen>
         await _storageService.activateSession(sessionId);
       }
 
-      final messages = await _storageService.loadMessages(sessionId);
+      final messages = await _storageService.loadMessages(
+        sessionId,
+        limit: _messagePageSize,
+      );
       final sessions = await _storageService.loadSessions();
       final activeSession = _findSessionById(sessions, sessionId);
 
@@ -3000,8 +3019,10 @@ class _ChatScreenState extends State<ChatScreen>
           ..clear()
           ..addAll(sessions);
         _selectedImageAttachments.clear();
+        _hasMoreMessages = messages.length == _messagePageSize;
+        _isLoadingOlderMessages = false;
+        _isLoadingMoreHistory = false;
       });
-      _resumePendingTasksForActiveSession();
       _scrollToBottom(animated: false);
     } catch (e) {
       if (!mounted) return;
@@ -3010,53 +3031,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   Future<void> _resumeInterruptedMessage(ChatMessage message) async {
-    final activeSession = _activeSession;
-    final messageId = message.id;
-    final taskId = message.remoteTaskId;
-    final clientRequestId = message.clientRequestId;
-    if (activeSession == null ||
-        messageId == null ||
-        ((taskId == null || taskId.trim().isEmpty) &&
-            (clientRequestId == null || clientRequestId.trim().isEmpty))) {
-      _showSnackBar('当前任务缺少恢复信息，无法继续恢复。');
-      return;
-    }
-
-    final resumedMessage = ChatMessage(
-      id: messageId,
-      text: '正在恢复任务状态...',
-      role: message.role,
-      createdAt: DateTime.now(),
-      generatedImages: message.generatedImages,
-      localImages: message.localImages,
-      generationOptions: message.generationOptions,
-      deliveryState: MessageDeliveryState.pending,
-      remoteTaskId: taskId,
-      clientRequestId: clientRequestId,
-    );
-
-    final savedMessage = await _storageService.updateMessage(
-      messageId: messageId,
-      message: resumedMessage,
-    );
-
-    if (!mounted) return;
-    setState(() {
-      final index = _messages.indexWhere((entry) => entry.id == messageId);
-      if (index >= 0 && savedMessage != null) {
-        _messages[index] = savedMessage;
-      }
-    });
-
-    unawaited(
-      _pollGenerationTask(
-        sessionId: activeSession.id,
-        messageId: messageId,
-        taskId: taskId,
-        clientRequestId: clientRequestId,
-        options: message.generationOptions ?? _generationOptions.normalized(),
-      ),
-    );
+    _showSnackBar('当前版本已恢复为 v1.2.12 逻辑，请重新提出生成需求。');
   }
 
   Future<void> _createSession() async {
@@ -3068,7 +3043,10 @@ class _ChatScreenState extends State<ChatScreen>
     try {
       final session = await _storageService.createSession();
       final sessions = await _storageService.loadSessions();
-      final history = await _storageService.loadGeneratedImageHistory();
+      final historyLimit = math.max(_generatedImageHistory.length, _historyPageSize);
+      final history = await _storageService.loadGeneratedImageHistory(
+        limit: historyLimit,
+      );
       final activeSession = _findSessionById(sessions, session.id) ?? session;
 
       if (!mounted) return;
@@ -3081,6 +3059,9 @@ class _ChatScreenState extends State<ChatScreen>
         _generatedImageHistory
           ..clear()
           ..addAll(history);
+        _hasMoreMessages = false;
+        _hasMoreHistory = history.length == historyLimit;
+        _isLoadingMoreHistory = false;
         _controller.clear();
         _selectedImageAttachments.clear();
       });
@@ -3203,10 +3184,18 @@ class _ChatScreenState extends State<ChatScreen>
             : _findSessionById(sessions, _activeSession!.id);
       }
 
-      final messages = nextActiveSession == null
-          ? const <ChatMessage>[]
-          : await _storageService.loadMessages(nextActiveSession.id);
-      final history = await _storageService.loadGeneratedImageHistory();
+      final messages = deletedActiveSession
+          ? (nextActiveSession == null
+              ? const <ChatMessage>[]
+              : await _storageService.loadMessages(
+                  nextActiveSession.id,
+                  limit: _messagePageSize,
+                ))
+          : List<ChatMessage>.from(_messages);
+      final historyLimit = math.max(_generatedImageHistory.length, _historyPageSize);
+      final history = await _storageService.loadGeneratedImageHistory(
+        limit: historyLimit,
+      );
 
       if (!mounted) return;
       setState(() {
@@ -3220,6 +3209,12 @@ class _ChatScreenState extends State<ChatScreen>
         _messages
           ..clear()
           ..addAll(messages);
+        _hasMoreMessages = deletedActiveSession
+            ? messages.length == _messagePageSize
+            : _hasMoreMessages;
+        _hasMoreHistory = history.length == historyLimit;
+        _isLoadingOlderMessages = false;
+        _isLoadingMoreHistory = false;
         _selectedImageAttachments.clear();
       });
       _showSnackBar('会话已删除。');
@@ -3262,7 +3257,10 @@ class _ChatScreenState extends State<ChatScreen>
     try {
       await _storageService.clearSessionMessages(activeSession.id);
       final sessions = await _storageService.loadSessions();
-      final history = await _storageService.loadGeneratedImageHistory();
+      final historyLimit = math.max(_generatedImageHistory.length, _historyPageSize);
+      final history = await _storageService.loadGeneratedImageHistory(
+        limit: historyLimit,
+      );
       final refreshedSession =
           _findSessionById(sessions, activeSession.id) ?? activeSession;
 
@@ -3276,6 +3274,10 @@ class _ChatScreenState extends State<ChatScreen>
           ..clear()
           ..addAll(history);
         _activeSession = refreshedSession;
+        _hasMoreMessages = false;
+        _hasMoreHistory = history.length == historyLimit;
+        _isLoadingOlderMessages = false;
+        _isLoadingMoreHistory = false;
       });
       _showSnackBar('当前会话已清空。');
     } catch (e) {
@@ -3294,6 +3296,10 @@ class _ChatScreenState extends State<ChatScreen>
         heightFactor: 0.92,
         child: _GeneratedImageHistorySheet(
           entries: _generatedImageHistory,
+          hasMore: _hasMoreHistory,
+          isLoadingMore: _isLoadingMoreHistory,
+          onLoadMore: _loadMoreGeneratedImageHistory,
+          onDeleteSelected: _deleteGeneratedImageHistoryEntries,
           onOpenSession: (sessionId) async {
             Navigator.of(sheetContext).pop();
             await _openSession(sessionId);
@@ -3301,6 +3307,81 @@ class _ChatScreenState extends State<ChatScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _deleteGeneratedImageHistoryEntries(List<int> imageIds) async {
+    if (imageIds.isEmpty) {
+      return;
+    }
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('删除已选图片'),
+        content: Text('将删除选中的 ${imageIds.length} 张本地生图记录。此操作不可恢复，确定继续吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete != true) {
+      return;
+    }
+
+    try {
+      await _storageService.deleteGeneratedImageHistoryEntries(imageIds);
+      final historyLimit = math.max(
+        _generatedImageHistory.length,
+        _historyPageSize,
+      );
+      final refreshedHistory = await _storageService.loadGeneratedImageHistory(
+        limit: historyLimit,
+      );
+
+      List<ChatMessage>? refreshedMessages;
+      final activeSession = _activeSession;
+      if (activeSession != null) {
+        refreshedMessages = await _storageService.loadMessages(
+          activeSession.id,
+          limit: _messagePageSize,
+        );
+      }
+
+      final refreshedSessions = await _storageService.loadSessions();
+      if (!mounted) return;
+      setState(() {
+        _generatedImageHistory
+          ..clear()
+          ..addAll(refreshedHistory);
+        _hasMoreHistory = refreshedHistory.length == historyLimit;
+        _sessions
+          ..clear()
+          ..addAll(refreshedSessions);
+        if (refreshedMessages != null) {
+          _messages
+            ..clear()
+            ..addAll(refreshedMessages);
+          _hasMoreMessages = refreshedMessages.length == _messagePageSize;
+        }
+        if (activeSession != null) {
+          _activeSession =
+              _findSessionById(refreshedSessions, activeSession.id) ??
+                  activeSession;
+        }
+      });
+      _showSnackBar('已删除 ${imageIds.length} 张本地生图记录。');
+    } catch (e) {
+      if (!mounted) return;
+      _showErrorDialog('删除图片历史失败：$e');
+    }
   }
 
   Widget _buildSessionPanel({
@@ -3493,6 +3574,15 @@ class _ChatScreenState extends State<ChatScreen>
     _showSnackBar('已引用到对话，后续发送会将它作为参考图。');
   }
 
+  void _quoteLocalImageAsReference(
+    ChatImageAttachment attachment,
+  ) {
+    _appendSelectedImageAttachments([attachment]);
+
+    if (!mounted) return;
+    _showSnackBar('已引用到对话，后续发送会将它作为参考图。');
+  }
+
   void _appendSelectedImageAttachments(
     List<ChatImageAttachment> attachments,
   ) {
@@ -3665,87 +3755,26 @@ class _ChatScreenState extends State<ChatScreen>
       return;
     }
 
-    ChatMessage? savedPendingBotMessage;
+    ChatMessage? pendingBotMessage;
     try {
-      final clientRequestId = _buildClientRequestId();
-      final pendingBotMessage = ChatMessage(
-        text: '正在生成图片...',
+      pendingBotMessage = ChatMessage(
+        text: '',
         role: Role.bot,
         generationOptions: requestOptions,
         deliveryState: MessageDeliveryState.pending,
-        clientRequestId: clientRequestId,
       );
-      savedPendingBotMessage = await _storageService.saveMessage(
-        sessionId: activeSession.id,
-        message: pendingBotMessage,
-      );
-      if (!mounted) return;
-      setState(() {
-        _messages.add(savedPendingBotMessage!);
-      });
+      if (mounted) {
+        setState(() {
+          _messages.add(pendingBotMessage!);
+        });
+      }
       _scrollToBottom();
 
       final response = await _chatService.sendMessage(
         prompt: text,
         options: requestOptions,
-        clientRequestId: clientRequestId,
         imageAttachments: imageAttachments,
       );
-      final taskId = response.taskId;
-      final resolvedClientRequestId =
-          response.clientRequestId ?? savedPendingBotMessage.clientRequestId;
-      if ((taskId != null && taskId.isNotEmpty) ||
-          (resolvedClientRequestId != null &&
-              resolvedClientRequestId.isNotEmpty)) {
-        final pendingWithTask = ChatMessage(
-          id: savedPendingBotMessage.id,
-          text: savedPendingBotMessage.text,
-          role: savedPendingBotMessage.role,
-          createdAt: savedPendingBotMessage.createdAt,
-          generatedImages: savedPendingBotMessage.generatedImages,
-          localImages: savedPendingBotMessage.localImages,
-          generationOptions: savedPendingBotMessage.generationOptions,
-          deliveryState: savedPendingBotMessage.deliveryState,
-          remoteTaskId: taskId,
-          clientRequestId: resolvedClientRequestId,
-        );
-        final updatedPendingMessage = await _storageService.updateMessage(
-          messageId: savedPendingBotMessage.id!,
-          message: pendingWithTask,
-        );
-        if (updatedPendingMessage != null) {
-          savedPendingBotMessage = updatedPendingMessage;
-          if (mounted) {
-            setState(() {
-              final index = _messages.indexWhere(
-                (message) => message.id == savedPendingBotMessage!.id,
-              );
-              if (index >= 0) {
-                _messages[index] = savedPendingBotMessage!;
-              }
-            });
-          }
-        }
-      }
-
-      if (response.taskStatus != 'completed') {
-        final pendingTaskId = savedPendingBotMessage.remoteTaskId;
-        final pendingClientRequestId = savedPendingBotMessage.clientRequestId;
-        if ((pendingTaskId != null && pendingTaskId.isNotEmpty) ||
-            (pendingClientRequestId != null &&
-                pendingClientRequestId.isNotEmpty)) {
-          unawaited(
-            _pollGenerationTask(
-              sessionId: activeSession.id,
-              messageId: savedPendingBotMessage.id!,
-              taskId: pendingTaskId,
-              clientRequestId: pendingClientRequestId,
-              options: requestOptions,
-            ),
-          );
-        }
-        return;
-      }
 
       if (!licenseStatus.isPremium) {
         licenseStatus = await _licenseService.consumeTrialUse();
@@ -3757,27 +3786,34 @@ class _ChatScreenState extends State<ChatScreen>
         role: Role.bot,
         generatedImages: response.generatedImages,
         generationOptions: requestOptions,
-        deliveryState: MessageDeliveryState.completed,
-        remoteTaskId: savedPendingBotMessage.remoteTaskId,
-        clientRequestId: savedPendingBotMessage.clientRequestId,
       );
-      final savedBotMessage = await _storageService.updateMessage(
-        messageId: savedPendingBotMessage.id!,
+      final savedBotMessage = await _storageService.saveMessage(
+        sessionId: activeSession.id,
         message: botMessage,
       );
+      final historyLimit = math.max(
+        _generatedImageHistory.length,
+        _historyPageSize,
+      );
       final sessions = await _storageService.loadSessions();
-      final history = await _storageService.loadGeneratedImageHistory();
+      final history = await _storageService.loadGeneratedImageHistory(
+        limit: historyLimit,
+      );
       final refreshedActiveSession =
           _findSessionById(sessions, activeSession.id) ?? activeSession;
 
       if (!mounted) return;
       setState(() {
         _licenseStatus = licenseStatus;
-        final index = _messages.indexWhere(
-          (message) => message.id == savedPendingBotMessage!.id,
-        );
-        if (index >= 0 && savedBotMessage != null) {
-          _messages[index] = savedBotMessage;
+        if (pendingBotMessage != null) {
+          final pendingIndex = _messages.indexOf(pendingBotMessage);
+          if (pendingIndex >= 0) {
+            _messages[pendingIndex] = savedBotMessage;
+          } else {
+            _messages.add(savedBotMessage);
+          }
+        } else {
+          _messages.add(savedBotMessage);
         }
         _sessions
           ..clear()
@@ -3785,26 +3821,27 @@ class _ChatScreenState extends State<ChatScreen>
         _generatedImageHistory
           ..clear()
           ..addAll(history);
+        _hasMoreHistory = history.length == historyLimit;
         _activeSession = refreshedActiveSession;
       });
+      unawaited(
+        _persistMessageImagesInBackground(
+          messageId: savedBotMessage.id!,
+          message: savedBotMessage,
+        ),
+      );
       _scrollToBottom();
     } catch (error) {
       final errorMessage = ChatMessage(
         text: '生成失败：${error.toString()}',
         role: Role.bot,
         generationOptions: requestOptions,
-        deliveryState: MessageDeliveryState.failed,
       );
       try {
-        final savedErrorMessage = savedPendingBotMessage != null
-            ? await _storageService.updateMessage(
-                messageId: savedPendingBotMessage.id!,
-                message: errorMessage,
-              )
-            : await _storageService.saveMessage(
-                sessionId: activeSession.id,
-                message: errorMessage,
-              );
+        final savedErrorMessage = await _storageService.saveMessage(
+          sessionId: activeSession.id,
+          message: errorMessage,
+        );
         final sessions = await _storageService.loadSessions();
         final refreshedActiveSession =
             _findSessionById(sessions, activeSession.id) ?? activeSession;
@@ -3812,14 +3849,14 @@ class _ChatScreenState extends State<ChatScreen>
         if (!mounted) return;
         setState(() {
           _licenseStatus = licenseStatus;
-          if (savedPendingBotMessage != null) {
-            final index = _messages.indexWhere(
-              (message) => message.id == savedPendingBotMessage!.id,
-            );
-            if (index >= 0 && savedErrorMessage != null) {
-              _messages[index] = savedErrorMessage;
+          if (pendingBotMessage != null) {
+            final pendingIndex = _messages.indexOf(pendingBotMessage);
+            if (pendingIndex >= 0) {
+              _messages[pendingIndex] = savedErrorMessage;
+            } else {
+              _messages.add(savedErrorMessage);
             }
-          } else if (savedErrorMessage != null) {
+          } else {
             _messages.add(savedErrorMessage);
           }
           _sessions
@@ -3849,7 +3886,7 @@ class _ChatScreenState extends State<ChatScreen>
     if (activeSession == null) {
       return;
     }
-    if (_isGenerationLocked) {
+    if (_isSending) {
       _showSnackBar('当前正在生成图片，请稍后再编辑。');
       return;
     }
@@ -3926,7 +3963,13 @@ class _ChatScreenState extends State<ChatScreen>
         message: botMessage,
       );
       final sessions = await _storageService.loadSessions();
-      final history = await _storageService.loadGeneratedImageHistory();
+      final historyLimit = math.max(
+        _generatedImageHistory.length,
+        _historyPageSize,
+      );
+      final history = await _storageService.loadGeneratedImageHistory(
+        limit: historyLimit,
+      );
       final refreshedActiveSession =
           _findSessionById(sessions, activeSession.id) ?? activeSession;
 
@@ -3940,8 +3983,15 @@ class _ChatScreenState extends State<ChatScreen>
         _generatedImageHistory
           ..clear()
           ..addAll(history);
+        _hasMoreHistory = history.length == historyLimit;
         _activeSession = refreshedActiveSession;
       });
+      unawaited(
+        _persistMessageImagesInBackground(
+          messageId: savedBotMessage.id!,
+          message: savedBotMessage,
+        ),
+      );
       _scrollToBottom();
       _showSnackBar('扩图已完成。');
     } catch (e) {
@@ -4085,7 +4135,7 @@ class _ChatScreenState extends State<ChatScreen>
     if (activeSession == null) {
       return;
     }
-    if (_isGenerationLocked) {
+    if (_isSending) {
       _showSnackBar('当前正在生成图片，请稍后再编辑。');
       return;
     }
@@ -4161,7 +4211,13 @@ class _ChatScreenState extends State<ChatScreen>
         message: botMessage,
       );
       final sessions = await _storageService.loadSessions();
-      final history = await _storageService.loadGeneratedImageHistory();
+      final historyLimit = math.max(
+        _generatedImageHistory.length,
+        _historyPageSize,
+      );
+      final history = await _storageService.loadGeneratedImageHistory(
+        limit: historyLimit,
+      );
       final refreshedActiveSession =
           _findSessionById(sessions, activeSession.id) ?? activeSession;
 
@@ -4175,8 +4231,15 @@ class _ChatScreenState extends State<ChatScreen>
         _generatedImageHistory
           ..clear()
           ..addAll(history);
+        _hasMoreHistory = history.length == historyLimit;
         _activeSession = refreshedActiveSession;
       });
+      unawaited(
+        _persistMessageImagesInBackground(
+          messageId: savedBotMessage.id!,
+          message: savedBotMessage,
+        ),
+      );
       _scrollToBottom();
       _showSnackBar('局部重绘已完成。');
     } catch (e) {
@@ -4459,78 +4522,136 @@ class _ChatScreenState extends State<ChatScreen>
                       ),
                     ),
                   Expanded(
-                    child: _messages.isEmpty
-                        ? LayoutBuilder(
-                            builder: (context, constraints) =>
-                                SingleChildScrollView(
-                              padding: EdgeInsets.fromLTRB(
-                                16,
-                                16,
-                                16,
-                                composerReservedHeight,
-                              ),
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  minHeight: constraints.maxHeight,
-                                ),
-                                child: Align(
-                                  alignment: Alignment.topCenter,
+                    child: Stack(
+                      children: [
+                        _messages.isEmpty
+                            ? LayoutBuilder(
+                                builder: (context, constraints) =>
+                                    SingleChildScrollView(
+                                  padding: EdgeInsets.fromLTRB(
+                                    16,
+                                    16,
+                                    16,
+                                    composerReservedHeight,
+                                  ),
                                   child: ConstrainedBox(
                                     constraints: BoxConstraints(
-                                      maxWidth: contentMaxWidth,
+                                      minHeight: constraints.maxHeight,
                                     ),
-                                    child: _EmptyWorkspaceHero(
-                                      title: activeSession == null
-                                          ? (licenseStatus?.isPremium ?? false)
-                                              ? '欢迎使用 Xii_Raw Graph 高级版'
-                                              : '欢迎使用 Xii_Raw Graph 试用版'
-                                          : '欢迎回到「${activeSession.title}」',
-                                      subtitle: licenseStatus?.summaryText ??
-                                          '现在支持本地 SQLite 会话保存，以及 AI 生图历史回看。',
-                                      sessionCount: _sessions.length,
-                                      imageHistoryCount:
-                                          _generatedImageHistory.length,
+                                    child: Align(
+                                      alignment: Alignment.topCenter,
+                                      child: ConstrainedBox(
+                                        constraints: BoxConstraints(
+                                          maxWidth: contentMaxWidth,
+                                        ),
+                                        child: _EmptyWorkspaceHero(
+                                          title: activeSession == null
+                                              ? (licenseStatus?.isPremium ?? false)
+                                                  ? '欢迎使用 Xii_Raw Graph 高级版'
+                                                  : '欢迎使用 Xii_Raw Graph 试用版'
+                                              : '欢迎回到「${activeSession.title}」',
+                                          subtitle: licenseStatus?.summaryText ??
+                                              '现在支持本地 SQLite 会话保存，以及 AI 生图历史回看。',
+                                          sessionCount: _sessions.length,
+                                          imageHistoryCount:
+                                              _generatedImageHistory.length,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : ListView.builder(
+                                controller: _scrollController,
+                                padding: EdgeInsets.fromLTRB(
+                                  16,
+                                  4,
+                                  16,
+                                  composerReservedHeight,
+                                ),
+                                itemCount: _messages.length,
+                                itemBuilder: (context, index) {
+                                  final message = _messages[index];
+                                  return Center(
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxWidth: contentMaxWidth,
+                                      ),
+                                      child: AnimatedMessageBubble(
+                                        key: ValueKey(
+                                          message.id ?? message.createdAt,
+                                        ),
+                                        message: message,
+                                        isNew: index == _messages.length - 1,
+                                        onOutpaintImage:
+                                            _handleOutpaintFromGeneratedImage,
+                                        onInpaintImage:
+                                            _handleInpaintFromGeneratedImage,
+                                        onQuoteImage:
+                                            _quoteGeneratedImageAsReference,
+                                        onQuoteLocalImage:
+                                            _quoteLocalImageAsReference,
+                                        onResumeInterruptedMessage:
+                                            _resumeInterruptedMessage,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                        if ((_hasMoreMessages || _isLoadingOlderMessages) &&
+                            _messages.isNotEmpty)
+                          Positioned(
+                            top: 10,
+                            left: 0,
+                            right: 0,
+                            child: IgnorePointer(
+                              child: Center(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF06111F)
+                                        .withValues(alpha: 0.88),
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: _AppChromePalette.borderSoft,
+                                    ),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (_isLoadingOlderMessages) ...[
+                                          const SizedBox(
+                                            width: 14,
+                                            height: 14,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 1.9,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                        ],
+                                        Text(
+                                          _isLoadingOlderMessages
+                                              ? '正在载入更早消息'
+                                              : '上滑可载入更早消息',
+                                          style: TextStyle(
+                                            color: _AppChromePalette.textMuted,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
                               ),
                             ),
-                          )
-                        : ListView.builder(
-                            controller: _scrollController,
-                            padding: EdgeInsets.fromLTRB(
-                              16,
-                              4,
-                              16,
-                              composerReservedHeight,
-                            ),
-                            itemCount: _messages.length,
-                            itemBuilder: (context, index) {
-                              final message = _messages[index];
-                              return Center(
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(
-                                    maxWidth: contentMaxWidth,
-                                  ),
-                                  child: AnimatedMessageBubble(
-                                    key: ValueKey(
-                                      message.id ?? message.createdAt,
-                                    ),
-                                    message: message,
-                                    isNew: index == _messages.length - 1,
-                                    onOutpaintImage:
-                                        _handleOutpaintFromGeneratedImage,
-                                    onInpaintImage:
-                                        _handleInpaintFromGeneratedImage,
-                                    onQuoteImage:
-                                        _quoteGeneratedImageAsReference,
-                                    onResumeInterruptedMessage:
-                                        _resumeInterruptedMessage,
-                                  ),
-                                ),
-                              );
-                            },
                           ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -5764,14 +5885,33 @@ class _EmptyWorkspaceHero extends StatelessWidget {
   }
 }
 
-class _GeneratedImageHistorySheet extends StatelessWidget {
+class _GeneratedImageHistorySheet extends StatefulWidget {
   final List<GeneratedImageHistoryEntry> entries;
+  final bool hasMore;
+  final bool isLoadingMore;
+  final Future<void> Function() onLoadMore;
+  final Future<void> Function(List<int> imageIds) onDeleteSelected;
   final ValueChanged<int> onOpenSession;
 
   const _GeneratedImageHistorySheet({
     required this.entries,
+    required this.hasMore,
+    required this.isLoadingMore,
+    required this.onLoadMore,
+    required this.onDeleteSelected,
     required this.onOpenSession,
   });
+
+  @override
+  State<_GeneratedImageHistorySheet> createState() =>
+      _GeneratedImageHistorySheetState();
+}
+
+class _GeneratedImageHistorySheetState
+    extends State<_GeneratedImageHistorySheet> {
+  final Set<int> _selectedEntryIds = <int>{};
+  bool _isSelectionMode = false;
+  bool _isDeleting = false;
 
   String _formatTime(DateTime time) {
     final month = time.month.toString().padLeft(2, '0');
@@ -5779,6 +5919,50 @@ class _GeneratedImageHistorySheet extends StatelessWidget {
     final hour = time.hour.toString().padLeft(2, '0');
     final minute = time.minute.toString().padLeft(2, '0');
     return '$month-$day $hour:$minute';
+  }
+
+  void _toggleSelectionMode() {
+    setState(() {
+      _isSelectionMode = !_isSelectionMode;
+      if (!_isSelectionMode) {
+        _selectedEntryIds.clear();
+      }
+    });
+  }
+
+  void _toggleEntrySelection(int id) {
+    setState(() {
+      if (_selectedEntryIds.contains(id)) {
+        _selectedEntryIds.remove(id);
+      } else {
+        _selectedEntryIds.add(id);
+      }
+    });
+  }
+
+  Future<void> _handleDeleteSelected() async {
+    if (_selectedEntryIds.isEmpty || _isDeleting) {
+      return;
+    }
+
+    setState(() {
+      _isDeleting = true;
+    });
+    try {
+      await widget.onDeleteSelected(_selectedEntryIds.toList(growable: false));
+      if (!mounted) return;
+      setState(() {
+        _isDeleting = false;
+        _isSelectionMode = false;
+        _selectedEntryIds.clear();
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isDeleting = false;
+      });
+      rethrow;
+    }
   }
 
   @override
@@ -5820,16 +6004,41 @@ class _GeneratedImageHistorySheet extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${entries.length} 张',
+                  '${widget.entries.length}${widget.hasMore ? '+' : ''} 张',
                   style: TextStyle(
                     color: _AppChromePalette.textMuted,
                   ),
                 ),
+                const SizedBox(width: 10),
+                TextButton(
+                  onPressed: widget.entries.isEmpty ? null : _toggleSelectionMode,
+                  child: Text(_isSelectionMode ? '取消选择' : '选择删除'),
+                ),
+                if (_isSelectionMode) ...[
+                  const SizedBox(width: 8),
+                  FilledButton.tonalIcon(
+                    onPressed: _selectedEntryIds.isEmpty || _isDeleting
+                        ? null
+                        : _handleDeleteSelected,
+                    icon: _isDeleting
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.delete_outline_rounded),
+                    label: Text(
+                      _selectedEntryIds.isEmpty
+                          ? '删除'
+                          : '删除 ${_selectedEntryIds.length}',
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
           Expanded(
-            child: entries.isEmpty
+            child: widget.entries.isEmpty
                 ? Center(
                     child: Text(
                       '还没有 AI 生图历史',
@@ -5847,9 +6056,57 @@ class _GeneratedImageHistorySheet extends StatelessWidget {
                       crossAxisSpacing: 16,
                       mainAxisExtent: 310,
                     ),
-                    itemCount: entries.length,
+                    itemCount: widget.entries.length +
+                        ((widget.hasMore || widget.isLoadingMore) ? 1 : 0),
                     itemBuilder: (context, index) {
-                      final entry = entries[index];
+                      if (index >= widget.entries.length) {
+                        return Container(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFF0F172A),
+                                Color(0xFF111827),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: _AppChromePalette.borderSoft,
+                            ),
+                          ),
+                          child: Center(
+                            child: widget.isLoadingMore
+                                ? Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const SizedBox(
+                                        width: 26,
+                                        height: 26,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.3,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 14),
+                                      Text(
+                                        '正在载入更多历史',
+                                        style: TextStyle(
+                                          color: _AppChromePalette.textMuted,
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : TextButton.icon(
+                                    onPressed: () {
+                                      unawaited(widget.onLoadMore());
+                                    },
+                                    icon: const Icon(Icons.expand_more_rounded),
+                                    label: const Text('继续加载'),
+                                  ),
+                          ),
+                        );
+                      }
+
+                      final entry = widget.entries[index];
+                      final isSelected = _selectedEntryIds.contains(entry.id);
                       return Container(
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
@@ -5860,28 +6117,66 @@ class _GeneratedImageHistorySheet extends StatelessWidget {
                           ),
                           borderRadius: BorderRadius.circular(22),
                           border: Border.all(
-                            color: _AppChromePalette.borderSoft,
+                            color: isSelected
+                                ? _AppChromePalette.accent
+                                : _AppChromePalette.borderSoft,
                           ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
-                              child: ClipRRect(
-                                borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(22),
-                                ),
-                                child: entry.image.hasBytes
-                                    ? Image.memory(
-                                        entry.image.bytes!,
-                                        width: double.infinity,
-                                        fit: BoxFit.cover,
-                                      )
-                                    : CachedNetworkImage(
-                                        imageUrl: entry.image.imageUrl!,
-                                        width: double.infinity,
-                                        fit: BoxFit.cover,
+                              child: Stack(
+                                children: [
+                                  Positioned.fill(
+                                    child: ClipRRect(
+                                      borderRadius: const BorderRadius.vertical(
+                                        top: Radius.circular(22),
                                       ),
+                                      child: entry.image.hasBytes
+                                          ? Image.memory(
+                                              entry.image.bytes!,
+                                              width: double.infinity,
+                                              fit: BoxFit.cover,
+                                            )
+                                          : CachedNetworkImage(
+                                              imageUrl: entry.image.imageUrl!,
+                                              width: double.infinity,
+                                              fit: BoxFit.cover,
+                                            ),
+                                    ),
+                                  ),
+                                  if (_isSelectionMode)
+                                    Positioned(
+                                      top: 10,
+                                      right: 10,
+                                      child: Material(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.42,
+                                        ),
+                                        borderRadius: BorderRadius.circular(999),
+                                        child: InkWell(
+                                          onTap: () =>
+                                              _toggleEntrySelection(entry.id),
+                                          borderRadius:
+                                              BorderRadius.circular(999),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(8),
+                                            child: Icon(
+                                              isSelected
+                                                  ? Icons.check_circle_rounded
+                                                  : Icons
+                                                      .radio_button_unchecked_rounded,
+                                              color: isSelected
+                                                  ? _AppChromePalette.accent
+                                                  : Colors.white,
+                                              size: 20,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                             Padding(
@@ -5922,11 +6217,24 @@ class _GeneratedImageHistorySheet extends StatelessWidget {
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: TextButton.icon(
-                                      onPressed: () =>
-                                          onOpenSession(entry.sessionId),
-                                      icon:
-                                          const Icon(Icons.open_in_new_rounded),
-                                      label: const Text('打开会话'),
+                                      onPressed: _isSelectionMode
+                                          ? () =>
+                                              _toggleEntrySelection(entry.id)
+                                          : () =>
+                                              widget.onOpenSession(entry.sessionId),
+                                      icon: Icon(
+                                        _isSelectionMode
+                                            ? (isSelected
+                                                ? Icons.check_rounded
+                                                : Icons
+                                                    .add_circle_outline_rounded)
+                                            : Icons.open_in_new_rounded,
+                                      ),
+                                      label: Text(
+                                        _isSelectionMode
+                                            ? (isSelected ? '已选择' : '选择')
+                                            : '打开会话',
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -5951,6 +6259,7 @@ class AnimatedMessageBubble extends StatefulWidget {
   final ValueChanged<GeneratedImageAsset> onOutpaintImage;
   final ValueChanged<GeneratedImageAsset> onInpaintImage;
   final ValueChanged<GeneratedImageAsset> onQuoteImage;
+  final ValueChanged<ChatImageAttachment> onQuoteLocalImage;
   final ValueChanged<ChatMessage> onResumeInterruptedMessage;
 
   const AnimatedMessageBubble({
@@ -5960,6 +6269,7 @@ class AnimatedMessageBubble extends StatefulWidget {
     required this.onOutpaintImage,
     required this.onInpaintImage,
     required this.onQuoteImage,
+    required this.onQuoteLocalImage,
     required this.onResumeInterruptedMessage,
   });
 
@@ -6025,6 +6335,7 @@ class _AnimatedMessageBubbleState extends State<AnimatedMessageBubble>
           onOutpaintImage: widget.onOutpaintImage,
           onInpaintImage: widget.onInpaintImage,
           onQuoteImage: widget.onQuoteImage,
+          onQuoteLocalImage: widget.onQuoteLocalImage,
           onResumeInterruptedMessage: widget.onResumeInterruptedMessage,
         ),
       ),
@@ -6037,6 +6348,7 @@ class ChatBubble extends StatelessWidget {
   final ValueChanged<GeneratedImageAsset> onOutpaintImage;
   final ValueChanged<GeneratedImageAsset> onInpaintImage;
   final ValueChanged<GeneratedImageAsset> onQuoteImage;
+  final ValueChanged<ChatImageAttachment> onQuoteLocalImage;
   final ValueChanged<ChatMessage> onResumeInterruptedMessage;
 
   const ChatBubble({
@@ -6045,6 +6357,7 @@ class ChatBubble extends StatelessWidget {
     required this.onOutpaintImage,
     required this.onInpaintImage,
     required this.onQuoteImage,
+    required this.onQuoteLocalImage,
     required this.onResumeInterruptedMessage,
   });
 
@@ -6272,6 +6585,7 @@ class ChatBubble extends StatelessWidget {
                                 filterQuality: FilterQuality.high,
                               ),
                             ),
+                            onQuote: () => onQuoteLocalImage(localImage),
                             child: Image.memory(
                               localImage.bytes,
                               fit: BoxFit.cover,
@@ -6329,79 +6643,7 @@ class ChatBubble extends StatelessWidget {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          if (message.isInterrupted || message.isFailed) ...[
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: message.isFailed
-                                    ? const Color(0xFFFEF2F2)
-                                    : const Color(0xFFFFF7ED),
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(
-                                  color: message.isFailed
-                                      ? const Color(0xFFFCA5A5)
-                                      : const Color(0xFFFCD34D),
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    message.isFailed
-                                        ? message.text
-                                        : (message.text.trim().isNotEmpty &&
-                                                message.text.trim() !=
-                                                    '任务状态同步超时，请点击重试继续恢复。' &&
-                                                message.text.trim() !=
-                                                    '任务状态同步中断，请稍后重试恢复。'
-                                            ? message.text
-                                            : '上次图片生成在应用关闭前未完成，可以继续恢复任务状态。'),
-                                    style: TextStyle(
-                                      color: message.isFailed
-                                          ? const Color(0xFF991B1B)
-                                          : const Color(0xFF9A3412),
-                                      height: 1.6,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  if (message.isInterrupted) ...[
-                                    const SizedBox(height: 10),
-                                    TextButton.icon(
-                                      onPressed: () =>
-                                          onResumeInterruptedMessage(message),
-                                      style: TextButton.styleFrom(
-                                        foregroundColor:
-                                            const Color(0xFFD97706),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 8,
-                                        ),
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                        minimumSize: Size.zero,
-                                        backgroundColor: const Color(
-                                          0xFFFFFFFF,
-                                        ).withValues(alpha: 0.46),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(999),
-                                        ),
-                                      ),
-                                      icon: const Icon(
-                                        Icons.refresh_rounded,
-                                        size: 16,
-                                      ),
-                                      label: const Text('继续恢复'),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ] else if (message.text.isNotEmpty) ...[
+                          if (message.text.isNotEmpty) ...[
                             const SizedBox(height: 6),
                             ConstrainedBox(
                               constraints: BoxConstraints(
@@ -6429,6 +6671,7 @@ class ChatBubble extends StatelessWidget {
                                   filterQuality: FilterQuality.high,
                                 ),
                               ),
+                              onQuote: () => onQuoteLocalImage(localImage),
                               child: Image.memory(
                                 localImage.bytes,
                                 fit: BoxFit.cover,
@@ -7933,22 +8176,24 @@ class _GeminiGenerationPlaceholderState
     with SingleTickerProviderStateMixin {
   static const TextStyle _stubTextStyle = TextStyle(
     fontSize: 13.5,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w500,
   );
 
   late final AnimationController _controller;
-  late final double _detailStubWidth;
-  late final double _referenceStubWidth;
+  late final List<double> _lineStubWidths;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1600),
+      duration: const Duration(milliseconds: 1450),
     )..repeat();
-    _detailStubWidth = _measureStubWidth('图像细节渲染中');
-    _referenceStubWidth = _measureStubWidth('保持参考图主体特征');
+    _lineStubWidths = [
+      _measureStubWidth('正在分析提示词与构图方向'),
+      _measureStubWidth('准备细节纹理与光影层次'),
+      _measureStubWidth('输出最终图像结果'),
+    ];
   }
 
   @override
@@ -7961,7 +8206,7 @@ class _GeminiGenerationPlaceholderState
   Widget build(BuildContext context) {
     final imageAspectRatio = _resolvePlaceholderAspectRatio(widget.sizeValue);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -7971,22 +8216,22 @@ class _GeminiGenerationPlaceholderState
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [
-                  Color(0xFF10213D),
-                  Color(0xFF172554),
+                  Color(0xFF0F172A),
+                  Color(0xFF1E293B),
                 ],
               ),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
-              Icons.auto_awesome_rounded,
+              Icons.smart_toy_rounded,
               color: Colors.white,
               size: 18,
             ),
           ),
           const SizedBox(width: 14),
           Expanded(
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(0, 2, 0, 8),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(0, 2, 0, 6),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -7998,40 +8243,20 @@ class _GeminiGenerationPlaceholderState
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      _buildPulseDot(const Color(0xFF5B8CFF), 0),
-                      const SizedBox(width: 6),
-                      _buildPulseDot(const Color(0xFF8B5CF6), 0.16),
-                      const SizedBox(width: 6),
-                      _buildPulseDot(const Color(0xFF06B6D4), 0.32),
-                      const SizedBox(width: 12),
-                      Text(
-                        '正在构图并生成图像…',
-                        style: TextStyle(
-                          color: _AppChromePalette.text,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
+                  const SizedBox(height: 8),
+                  RepaintBoundary(child: _buildTypingHeader()),
                   const SizedBox(height: 14),
-                  RepaintBoundary(
-                    child: _buildShimmerTextStub(
-                      _detailStubWidth,
-                      delay: 0.0,
+                  for (var i = 0; i < _lineStubWidths.length; i++) ...[
+                    RepaintBoundary(
+                      child: _buildShimmerTextStub(
+                        _lineStubWidths[i],
+                        delay: i * 0.14,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  RepaintBoundary(
-                    child: _buildShimmerTextStub(
-                      _referenceStubWidth,
-                      delay: 0.18,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
+                    if (i != _lineStubWidths.length - 1)
+                      const SizedBox(height: 9),
+                  ],
+                  const SizedBox(height: 16),
                   RepaintBoundary(
                     child: _buildImagePlaceholder(imageAspectRatio),
                   ),
@@ -8044,23 +8269,40 @@ class _GeminiGenerationPlaceholderState
     );
   }
 
-  Widget _buildPulseDot(Color color, double phase) {
+  Widget _buildTypingHeader() {
     return AnimatedBuilder(
       animation: _controller,
-      builder: (context, child) {
-        final t = (_controller.value + phase) % 1.0;
-        final scale = 0.85 + (0.35 * (1 - (t - 0.5).abs() * 2));
-        final alpha = (0.45 + (0.55 * (1 - (t - 0.5).abs() * 2))).clamp(0.0, 1.0);
-        return Transform.scale(
-          scale: scale,
-          child: Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: alpha),
-              shape: BoxShape.circle,
+      builder: (context, _) {
+        final phase = _controller.value;
+        final activeIndex = (phase * 3).floor() % 3;
+        final pulse = Curves.easeInOut.transform((phase * 3) % 1.0);
+
+        return Row(
+          children: [
+            Text(
+              '正在生成',
+              style: TextStyle(
+                color: _AppChromePalette.text,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
+            const SizedBox(width: 8),
+            for (var i = 0; i < 3; i++) ...[
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: i == activeIndex ? 7 + pulse * 2.5 : 6,
+                height: i == activeIndex ? 7 + pulse * 2.5 : 6,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8FD3FF).withValues(
+                    alpha: i == activeIndex ? 0.96 : 0.34,
+                  ),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              if (i != 2) const SizedBox(width: 5),
+            ],
+          ],
         );
       },
     );
@@ -8073,19 +8315,19 @@ class _GeminiGenerationPlaceholderState
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        final base = _AppChromePalette.panelElevated.withValues(alpha: 0.92);
-        final glow = const Color(0xFF7DD3FC).withValues(alpha: 0.88);
+        final base = Colors.white.withValues(alpha: 0.08);
+        final glow = Colors.white.withValues(alpha: 0.28);
         final shift = ((_controller.value + delay) % 1.0);
         return FractionallySizedBox(
           alignment: Alignment.centerLeft,
           child: Container(
             width: stubWidth,
-            height: 13,
+            height: 11,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(999),
               gradient: LinearGradient(
-                begin: Alignment(-1.0 + shift * 2.2, 0),
-                end: Alignment(-0.2 + shift * 2.2, 0),
+                begin: Alignment(-1.2 + shift * 2.4, 0),
+                end: Alignment(-0.1 + shift * 2.4, 0),
                 colors: [
                   base,
                   glow,
@@ -8134,25 +8376,25 @@ class _GeminiGenerationPlaceholderState
       animation: _controller,
       builder: (context, child) {
         final shift = _controller.value;
-        final base = _AppChromePalette.panelElevated.withValues(alpha: 0.86);
-        final glowA = const Color(0xFF7DD3FC).withValues(alpha: 0.84);
-        final glowB = const Color(0xFF93C5FD).withValues(alpha: 0.72);
+        final base = Colors.white.withValues(alpha: 0.06);
+        final glowA = Colors.white.withValues(alpha: 0.18);
+        final glowB = const Color(0xFF8FD3FF).withValues(alpha: 0.18);
 
         return Align(
           alignment: Alignment.centerLeft,
           child: SizedBox(
-            width: 232,
+            width: 220,
             child: AspectRatio(
               aspectRatio: aspectRatio,
               child: Container(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(18),
                   border: Border.all(
-                    color: _AppChromePalette.borderSoft,
+                    color: Colors.white.withValues(alpha: 0.08),
                   ),
                   gradient: LinearGradient(
-                    begin: Alignment(-1.2 + shift * 2.4, -0.8),
-                    end: Alignment(-0.1 + shift * 2.4, 0.8),
+                    begin: Alignment(-1.1 + shift * 2.2, -0.4),
+                    end: Alignment(0.1 + shift * 2.2, 0.6),
                     colors: [
                       base,
                       glowA,
@@ -8163,9 +8405,9 @@ class _GeminiGenerationPlaceholderState
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF38BDF8).withValues(alpha: 0.14),
-                      blurRadius: 22,
-                      offset: const Offset(0, 12),
+                      color: const Color(0xFF0EA5E9).withValues(alpha: 0.08),
+                      blurRadius: 18,
+                      offset: const Offset(0, 10),
                     ),
                   ],
                 ),
@@ -8173,16 +8415,16 @@ class _GeminiGenerationPlaceholderState
                   children: [
                     Positioned.fill(
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(18),
                         child: DecoratedBox(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                Colors.white.withValues(alpha: 0.10),
+                                Colors.white.withValues(alpha: 0.03),
                                 Colors.transparent,
-                                Colors.black.withValues(alpha: 0.16),
+                                Colors.black.withValues(alpha: 0.05),
                               ],
                             ),
                           ),
@@ -8193,20 +8435,35 @@ class _GeminiGenerationPlaceholderState
                       alignment: Alignment.center,
                       child: Icon(
                         Icons.image_search_rounded,
-                        size: 34,
-                        color: _AppChromePalette.textMuted.withValues(alpha: 0.6),
+                        size: 30,
+                        color: _AppChromePalette.textMuted.withValues(alpha: 0.38),
+                      ),
+                    ),
+                    Positioned(
+                      left: 14,
+                      right: 14,
+                      top: 14,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildMiniStub(88, 0.04),
+                          const SizedBox(height: 7),
+                          _buildMiniStub(132, 0.16),
+                        ],
                       ),
                     ),
                     Positioned(
                       left: 14,
                       right: 14,
                       bottom: 14,
-                      child: Container(
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _buildMiniStub(0, 0.30, expand: true),
+                          ),
+                          const SizedBox(width: 10),
+                          _buildMiniStub(38, 0.44),
+                        ],
                       ),
                     ),
                   ],
@@ -8215,6 +8472,39 @@ class _GeminiGenerationPlaceholderState
             ),
           ),
         );
+      },
+    );
+  }
+
+  Widget _buildMiniStub(
+    double width,
+    double delay, {
+    bool expand = false,
+  }) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final shift = ((_controller.value + delay) % 1.0);
+        final child = Container(
+          width: expand ? null : width,
+          height: 9,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            gradient: LinearGradient(
+              begin: Alignment(-1.2 + shift * 2.4, 0),
+              end: Alignment(-0.1 + shift * 2.4, 0),
+              colors: [
+                Colors.white.withValues(alpha: 0.06),
+                Colors.white.withValues(alpha: 0.20),
+                Colors.white.withValues(alpha: 0.06),
+              ],
+            ),
+          ),
+        );
+        if (expand) {
+          return child;
+        }
+        return SizedBox(width: width, child: child);
       },
     );
   }

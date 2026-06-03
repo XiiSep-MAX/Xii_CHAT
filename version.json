@@ -1,11 +1,11 @@
 {
-  "version": "1.2.15",
-  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.15.zip",
+  "version": "1.2.16",
+  "downloadUrl": "https://xiimax.top/downloads/Xii_Raw_Graph_Trial_v1.2.16.zip",
   "mirrorUrls": [
-    "https://github.com/XiiSep-MAX/Xii_CHAT/releases/download/v1.2.15/Xii_Raw_Graph_Trial_v1.2.15.zip"
+    "https://github.com/XiiSep-MAX/Xii_CHAT/releases/download/v1.2.16/Xii_Raw_Graph_Trial_v1.2.16.zip"
   ],
-  "sha256": "6a28baa95ea219f332a7c4ec52ba64594933ebfc991543ead8e003e64da89643",
-  "releaseNotes": "⚡ 1.2.15 会话切换与输入区动效优化\n\n本次更新包含：\n- 输入区外围边框新增更明显的单向扫光特效，光线不再来回往返，整体观感更统一\n- 优化会话切换流程，切换时不再额外重载整份生图历史，并取消切换后的自动滚动动画，降低卡顿感\n- 修复新增边框特效后可能触发的绘制异常，避免界面切换或重绘时出现运行时崩溃\n- 延续未完成生图任务恢复、重复生成锁定与参考图生成链路修复后的稳定行为",
+  "sha256": "1044294800391ba47c09d6eca1c35e3a065d5907242a888aa62cfdfb5a318149",
+  "releaseNotes": "⚡ 1.2.16 生图链路回稳与本地历史增强\n\n本次更新包含：\n- 生图链路整体回退并收敛到稳定的同步直返模式，移除旧 Worker 队列依赖，减少中转状态不一致导致的长期生成中问题\n- 升级本地消息与历史兼容处理，旧版未完成生图记录会统一转换为更明确的状态提示，避免升级后残留异常占位\n- AI 生图历史支持分页加载与批量选择删除，历史较多时滚动、切换和管理更轻一些\n- 强化本地数据库迁移兼容，针对旧库缺列场景补齐容错，降低部分用户无法正常进入 App 的风险\n- 生成过程中关闭 App 时新增退出警告弹窗，避免误关导致任务中断",
   "isForced": false,
-  "signature": "2z0z5SOkGwLU6SnTD79LNN9RYl30A7+qeSVEvqg4xCBD+EvPIFPTUAfLVbSKQoawlJYaFqH3EzKarXETmN2ABg=="
+  "signature": "jti6zAG/OKBJyVW7YZcPaNiQ7oZIQ4siEUK+ez5Aj3rx2Blc+DzVP2CI0BR7rbFFopXysfhhrfkzUaG18LnqDg=="
 }

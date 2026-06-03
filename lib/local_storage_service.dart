@@ -137,22 +137,28 @@ class LocalStorageService {
       ''');
     }
     if (oldVersion < 3) {
-      await db.execute('''
-        ALTER TABLE messages
-        ADD COLUMN delivery_state TEXT NOT NULL DEFAULT 'completed'
-      ''');
+      await _ensureColumnExists(
+        db,
+        table: 'messages',
+        column: 'delivery_state',
+        definition: "TEXT NOT NULL DEFAULT 'completed'",
+      );
     }
     if (oldVersion < 4) {
-      await db.execute('''
-        ALTER TABLE messages
-        ADD COLUMN remote_task_id TEXT
-      ''');
+      await _ensureColumnExists(
+        db,
+        table: 'messages',
+        column: 'remote_task_id',
+        definition: 'TEXT',
+      );
     }
     if (oldVersion < 5) {
-      await db.execute('''
-        ALTER TABLE messages
-        ADD COLUMN client_request_id TEXT
-      ''');
+      await _ensureColumnExists(
+        db,
+        table: 'messages',
+        column: 'client_request_id',
+        definition: 'TEXT',
+      );
     }
   }
 
@@ -524,22 +530,56 @@ class LocalStorageService {
     });
   }
 
-  Future<List<ChatMessage>> loadMessages(int sessionId) async {
+  Future<List<ChatMessage>> loadMessages(
+    int sessionId, {
+    int? limit,
+    DateTime? beforeCreatedAt,
+    int? beforeMessageId,
+  }) async {
+    final whereBuffer = StringBuffer('session_id = ?');
+    final whereArgs = <Object?>[sessionId];
+    if (beforeCreatedAt != null && beforeMessageId != null) {
+      whereBuffer.write(
+        ' AND (created_at < ? OR (created_at = ? AND id < ?))',
+      );
+      final cursor = beforeCreatedAt.toIso8601String();
+      whereArgs
+        ..add(cursor)
+        ..add(cursor)
+        ..add(beforeMessageId);
+    }
+
     final messageRows = await _db.query(
       'messages',
-      where: 'session_id = ?',
-      whereArgs: [sessionId],
-      orderBy: 'created_at ASC, id ASC',
+      where: whereBuffer.toString(),
+      whereArgs: whereArgs,
+      orderBy: limit == null ? 'created_at ASC, id ASC' : 'created_at DESC, id DESC',
+      limit: limit,
     );
 
     if (messageRows.isEmpty) {
       return const <ChatMessage>[];
     }
 
+    final orderedMessageRows = limit == null
+        ? messageRows
+        : messageRows.reversed.toList(growable: false);
+    final messageIds = orderedMessageRows
+        .map((row) => row['id'] as int)
+        .toList(growable: false);
+    final imageWhere = StringBuffer('session_id = ?');
+    final imageWhereArgs = <Object?>[sessionId];
+    if (messageIds.isNotEmpty) {
+      imageWhere.write(
+        ' AND message_id IN (${List.filled(messageIds.length, '?').join(', ')})',
+      );
+      imageWhereArgs.addAll(messageIds);
+    }
+
     final imageRows = await _db.query(
       'generated_images',
-      where: 'session_id = ?',
-      whereArgs: [sessionId],
+      where: imageWhere.toString(),
+      whereArgs: imageWhereArgs,
       orderBy: 'created_at ASC, id ASC',
     );
 
@@ -551,7 +591,7 @@ class LocalStorageService {
           .add(_mapGeneratedImage(row));
     }
 
-    return messageRows.map((row) {
+    return orderedMessageRows.map((row) {
       final id = row['id'] as int;
       return ChatMessage(
         id: id,
@@ -590,7 +630,7 @@ class LocalStorageService {
       WHERE
         m.role = ? AND
         m.delivery_state IN (?, ?) AND
-        (m.remote_task_id IS NOT NULL OR m.client_request_id IS NOT NULL)
+        (m.remote_task_id IS NOT NULL AND TRIM(m.remote_task_id) != '')
       GROUP BY
         m.id,
         m.session_id,
@@ -734,7 +774,11 @@ class LocalStorageService {
     );
   }
 
-  Future<List<GeneratedImageHistoryEntry>> loadGeneratedImageHistory() async {
+  Future<List<GeneratedImageHistoryEntry>> loadGeneratedImageHistory({
+    int? limit,
+    int offset = 0,
+  }) async {
+    final pagingClause = limit == null ? '' : ' LIMIT ? OFFSET ?';
     final rows = await _db.rawQuery('''
       SELECT
         gi.id,
@@ -752,7 +796,8 @@ class LocalStorageService {
       INNER JOIN sessions s ON s.id = gi.session_id
       INNER JOIN messages m ON m.id = gi.message_id
       ORDER BY gi.created_at DESC, gi.id DESC
-    ''');
+      $pagingClause
+    ''', limit == null ? const <Object?>[] : <Object?>[limit, offset]);
 
     return rows.map((row) {
       final options = _decodeGenerationOptions(
@@ -770,6 +815,46 @@ class LocalStorageService {
         image: _mapGeneratedImage(row),
       );
     }).toList(growable: false);
+  }
+
+  Future<void> deleteGeneratedImageHistoryEntries(List<int> imageIds) async {
+    if (imageIds.isEmpty) {
+      return;
+    }
+
+    final now = DateTime.now().toIso8601String();
+    await _db.transaction((txn) async {
+      final placeholders = List.filled(imageIds.length, '?').join(', ');
+      final sessionRows = await txn.rawQuery(
+        '''
+        SELECT DISTINCT session_id
+        FROM generated_images
+        WHERE id IN ($placeholders)
+        ''',
+        imageIds,
+      );
+
+      await txn.delete(
+        'generated_images',
+        where: 'id IN ($placeholders)',
+        whereArgs: imageIds,
+      );
+
+      for (final row in sessionRows) {
+        final sessionId = row['session_id'];
+        if (sessionId == null) {
+          continue;
+        }
+        await txn.update(
+          'sessions',
+          {
+            'updated_at': now,
+          },
+          where: 'id = ?',
+          whereArgs: [sessionId],
+        );
+      }
+    });
   }
 
   ChatSessionInfo _mapSessionInfo(Map<String, Object?> row) {
@@ -880,6 +965,84 @@ class LocalStorageService {
       where: 'delivery_state = ?',
       whereArgs: [MessageDeliveryState.pending.name],
     );
+  }
+
+  Future<void> normalizeLegacyGenerationMessages() async {
+    const restartRequiredText = '上次生成未完成，请重新提出生成需求。';
+    const recoverableStatusText = '检测到上次未完成任务，正在校验状态...';
+    const legacyTransientTexts = <String>{
+      '正在生成图片...',
+      '正在恢复任务状态...',
+      '任务已提交，正在生成中。',
+      '任务状态同步超时，请点击重试继续恢复。',
+      '任务状态同步中断，请稍后重试恢复。',
+    };
+
+    final rows = await _db.rawQuery('''
+      SELECT
+        m.id,
+        m.text,
+        m.delivery_state,
+        m.remote_task_id
+      FROM messages m
+      WHERE
+        m.role = ? AND
+        NOT EXISTS (
+          SELECT 1
+          FROM generated_images gi
+          WHERE gi.message_id = m.id
+        ) AND (
+          m.delivery_state IN (?, ?) OR
+          TRIM(m.text) IN (${List.filled(legacyTransientTexts.length, '?').join(', ')})
+        )
+    ''', [
+      Role.bot.name,
+      MessageDeliveryState.pending.name,
+      MessageDeliveryState.interrupted.name,
+      ...legacyTransientTexts,
+    ]);
+
+    if (rows.isEmpty) {
+      return;
+    }
+
+    await _db.transaction((txn) async {
+      for (final row in rows) {
+        final messageId = row['id'] as int;
+        final deliveryState = (row['delivery_state'] as String?)?.trim() ?? '';
+        final text = (row['text'] as String?)?.trim() ?? '';
+        final remoteTaskId = (row['remote_task_id'] as String?)?.trim() ?? '';
+        final isLegacyTransient = legacyTransientTexts.contains(text);
+        final hasRecoverableTask = remoteTaskId.isNotEmpty;
+
+        String nextState = deliveryState;
+        String nextText = text;
+
+        if (!hasRecoverableTask) {
+          nextState = MessageDeliveryState.interrupted.name;
+          nextText = restartRequiredText;
+        } else if (deliveryState == MessageDeliveryState.pending.name ||
+            isLegacyTransient ||
+            text == restartRequiredText) {
+          nextState = MessageDeliveryState.interrupted.name;
+          nextText = recoverableStatusText;
+        }
+
+        if (nextState == deliveryState && nextText == text) {
+          continue;
+        }
+
+        await txn.update(
+          'messages',
+          {
+            'delivery_state': nextState,
+            'text': nextText,
+          },
+          where: 'id = ?',
+          whereArgs: [messageId],
+        );
+      }
+    });
   }
 
   GeneratedImageAsset _mapGeneratedImage(Map<String, Object?> row) {

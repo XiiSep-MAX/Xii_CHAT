@@ -33,7 +33,14 @@ Future<void> main(List<String> args) async {
   final payload = _canonicalJson(jsonMap);
 
   final algorithm = Ed25519();
-  final privateKeySeed = base64Decode(privateKeyBase64);
+  final privateKeyBytes = base64Decode(privateKeyBase64);
+  final privateKeySeed = switch (privateKeyBytes.length) {
+    32 => privateKeyBytes,
+    64 => privateKeyBytes.sublist(0, 32),
+    _ => throw ArgumentError(
+        'UPDATE_METADATA_SIGNING_PRIVATE_KEY must decode to 32-byte seed or 64-byte private key, got ${privateKeyBytes.length} bytes.',
+      ),
+  };
   final privateKey = await algorithm.newKeyPairFromSeed(privateKeySeed);
   final signature = await algorithm.sign(
     utf8.encode(payload),

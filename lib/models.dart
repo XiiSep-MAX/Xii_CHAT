@@ -170,9 +170,12 @@ class ChatMessage {
   bool get hasResolvableRemoteTask =>
       role == Role.bot &&
       generatedImages.isEmpty &&
-      ((remoteTaskId != null && remoteTaskId!.trim().isNotEmpty) ||
-          (clientRequestId != null && clientRequestId!.trim().isNotEmpty)) &&
+      (remoteTaskId != null && remoteTaskId!.trim().isNotEmpty) &&
       (isPending || isInterrupted);
+  bool get shouldOfferRecoveryAction =>
+      hasResolvableRemoteTask &&
+      !text.contains('任务结果同步超时') &&
+      !text.contains('任务结果同步中断');
   bool get shouldShowGenerationPlaceholder => isPending;
 }
 
